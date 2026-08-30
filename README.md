@@ -1,5 +1,7 @@
 # Rivals Beyond Launcher
 
+[![Build Windows launcher](https://github.com/Walfhand/rivals-beyond-launcher/actions/workflows/launcher-windows.yml/badge.svg)](https://github.com/Walfhand/rivals-beyond-launcher/actions/workflows/launcher-windows.yml)
+
 Public, reproducible source for the Windows launcher of **Rivals Beyond**.
 
 The launcher installs, repairs and starts the game client from signed manifests. It also updates itself from immutable, signed NSIS releases. This repository contains the launcher and its visual assets; it does not contain the game client, server, accounts or private signing keys.
