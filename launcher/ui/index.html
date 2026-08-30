@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>Rivals Beyond</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#home">Aller au contenu</a>
+    <header class="topbar">
+      <button class="brand" type="button" data-scroll="home"
+              aria-label="Retour à l’accueil">
+        <img src="assets/moba-logo.png" width="500" height="234" alt="">
+      </button>
+      <nav aria-label="Navigation principale">
+        <button class="nav-link active" type="button" data-scroll="home">Accueil</button>
+        <button class="nav-link" type="button" data-scroll="news">Notes de mise à jour</button>
+      </nav>
+      <div class="topbar-spacer"></div>
+      <div id="service-status" class="service-status checking" role="status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="service-label">Vérification des services…</span>
+      </div>
+      <button id="settings" class="icon-button" type="button"
+              aria-label="Ouvrir les paramètres" title="Paramètres">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm8.2 4.8v-2.4l-2.3-.7a7 7 0 0 0-.7-1.7l1.1-2.1-1.7-1.7-2.1 1.1a7 7 0 0 0-1.7-.7L12 2.8H9.6l-.7 2.3a7 7 0 0 0-1.7.7L5.1 4.7 3.4 6.4l1.1 2.1a7 7 0 0 0-.7 1.7l-2.3.7v2.4l2.3.7a7 7 0 0 0 .7 1.7l-1.1 2.1 1.7 1.7 2.1-1.1a7 7 0 0 0 1.7.7l.7 2.3H12l.7-2.3a7 7 0 0 0 1.7-.7l2.1 1.1 1.7-1.7-1.1-2.1a7 7 0 0 0 .7-1.7l2.3-.7Z"/>
+        </svg>
+      </button>
+    </header>
+
+    <main id="home" class="stage">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p id="hero-eyebrow" class="eyebrow">SAISON 0 · LE SEUIL</p>
+          <h1 id="hero-title">Entrez dans<br>le Seuil</h1>
+          <p id="hero-summary" class="hero-summary">
+            Dix Inassouvis s’affrontent entre deux Nexus sur The Last Divide.
+          </p>
+          <button id="hero-cta" class="outline-button" type="button">
+            Lire les chroniques
+          </button>
+        </div>
+      </section>
+
+      <section id="news" class="news-section" aria-labelledby="news-title">
+        <div class="section-heading">
+          <h2 id="news-title">Chroniques du Seuil</h2>
+          <span class="heading-line" aria-hidden="true"></span>
+        </div>
+        <div id="news-grid" class="news-grid">
+          <article class="news-card">
+            <div class="news-art" aria-hidden="true"></div>
+            <div class="news-copy">
+              <p class="news-category">CARTE</p>
+              <h3>Le Sanctuaire</h3>
+              <p class="news-summary">Découvrez le nouveau lobby hors match.</p>
+              <time datetime="2026-08-28">28 août 2026</time>
+            </div>
+          </article>
+          <article class="news-card">
+            <div class="news-art" aria-hidden="true"></div>
+            <div class="news-copy">
+              <p class="news-category">ÉVÉNEMENT</p>
+              <h3>Événement du boss</h3>
+              <p class="news-summary">Unissez les deux équipes avant la bataille pour le coffre.</p>
+              <time datetime="2026-08-28">28 août 2026</time>
+            </div>
+          </article>
+          <article class="news-card">
+            <div class="news-art" aria-hidden="true"></div>
+            <div class="news-copy">
+              <p class="news-category">CHAMPIONS</p>
+              <h3>10 champions jouables</h3>
+              <p class="news-summary">Choisissez votre archétype et maîtrisez son kit.</p>
+              <time datetime="2026-08-28">28 août 2026</time>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="action-dock" aria-labelledby="client-status">
+      <div id="error-banner" class="error-banner" hidden>
+        <div>
+          <strong id="error-message">La mise à jour a échoué.</strong>
+          <details>
+            <summary>Détails techniques</summary>
+            <code id="error-detail"></code>
+          </details>
+        </div>
+      </div>
+
+      <div class="update-state">
+        <p id="status-kicker" class="dock-kicker">CLIENT DE JEU</p>
+        <p id="client-status" class="client-status" role="status" aria-live="polite">
+          Sélectionne un dossier d’installation
+        </p>
+        <p id="version" class="version">Version non installée</p>
+        <progress id="progress" max="100" value="0" aria-label="Progression"></progress>
+      </div>
+
+      <div class="transfer-state">
+        <svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/>
+        </svg>
+        <div>
+          <p id="progress-detail">Prêt</p>
+          <p id="transfer-speed" class="transfer-speed"></p>
+        </div>
+      </div>
+
+      <div class="primary-actions">
+        <button id="primary-action" class="primary-button" type="button">
+          Installer
+        </button>
+        <button id="more-options" class="more-button" type="button"
+                aria-label="Options du client" title="Options du client">•••</button>
+      </div>
+    </footer>
+
+    <dialog id="settings-dialog" class="settings-dialog">
+      <form method="dialog" class="settings-panel">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">PARAMÈTRES</p>
+            <h2>Installation du client</h2>
+          </div>
+          <button class="dialog-close" value="cancel" aria-label="Fermer">×</button>
+        </div>
+
+        <label for="client-path">Dossier du client</label>
+        <div class="path-row">
+          <input id="client-path" type="text" readonly
+                 placeholder="Choisir un dossier vide ou un client existant">
+          <button id="choose" class="secondary-button" type="button">Choisir</button>
+        </div>
+        <p class="setting-help">
+          Les paramètres, captures d’écran, addons et fichiers personnels sont conservés.
+        </p>
+
+        <div class="dialog-actions">
+          <button id="repair" class="secondary-button" type="button" disabled>
+            Vérifier et réparer
+          </button>
+          <button class="secondary-button" value="cancel">Fermer</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

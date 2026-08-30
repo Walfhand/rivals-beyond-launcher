@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-30",
+  "hero": {
+    "eyebrow": "SAISON 0 · LE SEUIL",
+    "title": "Entrez dans le Seuil",
+    "summary": "Dix Inassouvis s’affrontent entre deux Nexus sur The Last Divide.",
+    "cta": "Lire les chroniques"
+  },
+  "items": [
+    {
+      "category": "CARTE",
+      "title": "Le Sanctuaire",
+      "summary": "Découvrez le nouveau lobby hors match du Sanctuaire de l’Invocateur.",
+      "published_at": "2026-08-28"
+    },
+    {
+      "category": "ÉVÉNEMENT",
+      "title": "Événement du boss",
+      "summary": "Coopérez avec l’équipe adverse, terrassez le boss puis disputez-vous son coffre.",
+      "published_at": "2026-08-28"
+    },
+    {
+      "category": "CHAMPIONS",
+      "title": "10 champions jouables",
+      "summary": "Choisissez votre archétype et maîtrisez un kit pensé pour le combat MOBA.",
+      "published_at": "2026-08-28"
+    }
+  ]
+}

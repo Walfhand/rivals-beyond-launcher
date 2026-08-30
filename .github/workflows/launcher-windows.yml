@@ -1,0 +1,88 @@
+name: Build Windows launcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      realm_address:
+        description: Realm hostname or IP written to realmlist.wtf
+        required: true
+      manifest_url:
+        description: Signed client manifest URL
+        required: true
+        default: https://moba-data.nbg1.your-objectstorage.com/client/manifests/stable.json
+      news_url:
+        description: Signed launcher news URL
+        required: true
+        default: https://moba-data.nbg1.your-objectstorage.com/launcher/news/stable.json
+      publish:
+        description: Publish this signed launcher as the automatic stable update
+        required: true
+        type: boolean
+        default: false
+      release_notes:
+        description: Launcher update notes
+        required: true
+        default: Mise à jour du launcher.
+
+permissions:
+  contents: read
+
+jobs:
+  launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Test updater core
+        run: cargo test --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --lib
+
+      - name: Test launcher release tooling and interface wiring
+        run: python -m unittest launcher/test_generate_manifest.py launcher/test_publish_client.py launcher/test_publish_launcher.py launcher/test_ui.py
+
+      - name: Build signed NSIS installer
+        id: build
+        uses: tauri-apps/tauri-action@v1
+        env:
+          MOBA_MANIFEST_URL: ${{ inputs.manifest_url }}
+          MOBA_NEWS_URL: ${{ inputs.news_url }}
+          MOBA_REALM_ADDRESS: ${{ inputs.realm_address }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: launcher
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: moba-launcher-[platform]-[arch]-[bundle]
+          uploadUpdaterSignatures: true
+          updaterJsonPreferNsis: true
+
+      - name: Verify updater signature against the tracked public key
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "launcher/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer not found" }
+          $signature = "$($installer.FullName).sig"
+          if (-not (Test-Path $signature)) { throw "NSIS updater signature not found" }
+          cargo run --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --example verify_updater_signature -- "$($installer.FullName)" $signature launcher/updater-public-key.pub
+
+      - name: Upload updater signature
+        uses: actions/upload-artifact@v4
+        with:
+          name: moba-launcher-windows-x64-nsis-signature
+          path: launcher/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+          if-no-files-found: error
+
+      - name: Publish automatic launcher update to S3
+        if: ${{ inputs.publish }}
+        shell: pwsh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.MOBA_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.MOBA_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.MOBA_S3_REGION }}
+          AWS_EC2_METADATA_DISABLED: "true"
+          LAUNCHER_RELEASE_NOTES: ${{ inputs.release_notes }}
+          LAUNCHER_VERSION: ${{ steps.build.outputs.appVersion }}
+        run: |
+          $installer = Get-ChildItem "launcher/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          python launcher/publish_launcher.py "$($installer.FullName)" "$($installer.FullName).sig" --version $env:LAUNCHER_VERSION --notes $env:LAUNCHER_RELEASE_NOTES --no-profile

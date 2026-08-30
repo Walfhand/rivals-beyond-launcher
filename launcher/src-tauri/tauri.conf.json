@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Rivals Beyond",
+  "version": "0.3.1",
+  "identifier": "game.rivalsbeyond.launcher",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Rivals Beyond",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 680,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Installe, met à jour et lance Rivals Beyond"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRERjg5NDk3QTM3NjMxQjgKUldTNE1YYWpsNVQ0VGNtaWFsNXQwVFlCcURnbEUxbk5QV2E5ZEZoK0I5a0tjQnVYN2FrazM3c2EK",
+      "endpoints": [
+        "https://moba-data.nbg1.your-objectstorage.com/launcher/releases/stable.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

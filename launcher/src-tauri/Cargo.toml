@@ -1,0 +1,36 @@
+[package]
+name = "moba-launcher"
+version = "0.3.1"
+description = "Launcher and client updater for MOBA 3.3.5a"
+edition = "2021"
+
+[lib]
+name = "moba_launcher_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "moba-launcher"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+[features]
+default = ["desktop"]
+desktop = ["dep:tauri", "dep:tauri-plugin-dialog", "dep:tauri-plugin-updater"]
+
+[build-dependencies]
+tauri-build = "2"
+
+[dependencies]
+ed25519-dalek = "2"
+base64 = "0.22"
+minisign-verify = "0.2.5"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tauri = { version = "2", optional = true }
+tauri-plugin-dialog = { version = "2", optional = true }
+tauri-plugin-updater = { version = "2.10.1", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }

@@ -1,0 +1,5 @@
+/launcher/dist/
+/launcher/secrets/
+/launcher/src-tauri/target/
+__pycache__/
+*.pyc
