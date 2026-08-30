@@ -14,9 +14,6 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-import generate_manifest
-
-
 PROFILE = "moba-s3"
 ENDPOINT = "https://nbg1.your-objectstorage.com"
 BUCKET = "moba-data"
@@ -228,7 +225,8 @@ def main() -> int:
         )
         if remote and remote.get("version") == args.version and remote != latest:
             raise ValueError(f"stable version {args.version} already has different content")
-        generate_manifest.write_manifest(DEFAULT_OUTPUT, latest)
+        DEFAULT_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+        DEFAULT_OUTPUT.write_text(json.dumps(latest, indent=2) + "\n")
         if args.dry_run:
             print(f"Dry run valid: launcher {args.version}")
             return 0

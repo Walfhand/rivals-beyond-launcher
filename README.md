@@ -11,8 +11,6 @@ The updater core is testable without the Windows desktop runtime:
 ```bash
 cargo test --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --lib
 python3 -m unittest \
-  launcher/test_generate_manifest.py \
-  launcher/test_publish_client.py \
   launcher/test_publish_launcher.py \
   launcher/test_ui.py
 ```
