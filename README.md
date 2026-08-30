@@ -27,4 +27,4 @@ The Tauri updater signature authenticates automatic updates. Authenticode signin
 
 ## License
 
-GNU General Public License v2.0. See [COPYING](COPYING).
+GNU General Public License v2.0. See [LICENSE](LICENSE).
