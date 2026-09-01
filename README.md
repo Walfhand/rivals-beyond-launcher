@@ -6,6 +6,16 @@ Public, reproducible source for the Windows launcher of **Rivals Beyond**.
 
 The launcher installs, repairs and starts the game client from signed manifests. It also updates itself from immutable, signed NSIS releases. This repository contains the launcher and its visual assets; it does not contain the game client, server, accounts or private signing keys.
 
+The game-client manifest is composed and signed outside this public repository. The updater currently
+requires `WarcraftXL.dll`, `Extensions/RivalsBeyond/RivalsBeyond.dll` and the pinned
+`Extensions/UnitOutline/UnitOutline.dll` plus `Extensions/wxl-modern-m2/wxl-modern-m2.dll`, which
+owns the M2 draw event Unit Outline consumes; after installing that payload
+it removes the retired `AwesomeWotlkLib.dll`. No private signing material is needed to build or test
+this behavior.
+
+Release launcher `0.3.2` before publishing the first WarcraftXL game manifest. Launcher self-update
+runs before the game-client update, which guarantees the retired DLL cleanup code is present first.
+
 ## Build and test
 
 The updater core is testable without the Windows desktop runtime:

@@ -1,6 +1,6 @@
 [package]
 name = "moba-launcher"
-version = "0.3.1"
+version = "0.3.2"
 description = "Launcher and client updater for MOBA 3.3.5a"
 edition = "2021"
 

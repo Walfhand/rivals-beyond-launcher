@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Rivals Beyond",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "identifier": "game.rivalsbeyond.launcher",
   "build": {
     "frontendDist": "../ui"

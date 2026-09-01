@@ -24,6 +24,10 @@ const OBJECT_HOST: &str = "moba-data.nbg1.your-objectstorage.com";
 const REQUIRED_FILES: &[&str] = &[
     "wow.exe",
     "d3d9.dll",
+    "warcraftxl.dll",
+    "extensions/rivalsbeyond/rivalsbeyond.dll",
+    "extensions/unitoutline/unitoutline.dll",
+    "extensions/wxl-modern-m2/wxl-modern-m2.dll",
     "data/common.mpq",
     "data/patch-c.mpq",
     "data/patch-e.mpq",
@@ -31,7 +35,11 @@ const REQUIRED_FILES: &[&str] = &[
     "data/patch-z.mpq",
     "data/frfr/locale-frfr.mpq",
 ];
-const LEGACY_CUSTOM_PATCHES: &[&str] = &["Data/patch-4.MPQ", "Data/frFR/patch-frFR-4.MPQ"];
+const RETIRED_MANAGED_FILES: &[&str] = &[
+    "AwesomeWotlkLib.dll",
+    "Data/patch-4.MPQ",
+    "Data/frFR/patch-frFR-4.MPQ",
+];
 const PUBLIC_KEY_HEX: &str = include_str!("../../manifest-public-key.hex");
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -368,12 +376,12 @@ where
             .as_ref()
             .is_some_and(|state| state.manifest_sha256 == loaded.sha256);
     let changed = scan(root, &loaded.manifest, trust_sizes, &mut progress)?;
-    let legacy_patches = legacy_custom_patches_to_remove(root, &loaded.manifest)?;
+    let retired_files = retired_managed_files_to_remove(root, &loaded.manifest)?;
     let download_total = changed.iter().try_fold(0u64, |sum, entry| {
         sum.checked_add(entry.size)
             .ok_or_else(|| "La taille des téléchargements déborde.".to_string())
     })?;
-    if !changed.is_empty() || !legacy_patches.is_empty() {
+    if !changed.is_empty() || !retired_files.is_empty() {
         write_incomplete_state(root, &loaded.sha256)?;
     }
     let mut completed_bytes = 0u64;
@@ -414,7 +422,7 @@ where
         });
     }
 
-    remove_legacy_custom_patches(&legacy_patches)?;
+    remove_retired_managed_files(&retired_files)?;
     write_realmlist(root, realm_address)?;
     write_state(
         root,
@@ -428,15 +436,15 @@ where
     clear_incomplete_state(root)?;
     Ok(UpdateSummary {
         version: loaded.manifest.client_version,
-        changed_files: changed.len() + legacy_patches.len(),
+        changed_files: changed.len() + retired_files.len(),
     })
 }
 
-fn remove_legacy_custom_patches(paths: &[PathBuf]) -> Result<(), String> {
+fn remove_retired_managed_files(paths: &[PathBuf]) -> Result<(), String> {
     for path in paths {
         fs::remove_file(path).map_err(|error| {
             format!(
-                "Suppression de l’ancien patch {} impossible : {error}",
+                "Suppression de l’ancien fichier géré {} impossible : {error}",
                 path.display()
             )
         })?;
@@ -444,7 +452,7 @@ fn remove_legacy_custom_patches(paths: &[PathBuf]) -> Result<(), String> {
     Ok(())
 }
 
-fn legacy_custom_patches_to_remove(
+fn retired_managed_files_to_remove(
     root: &Path,
     manifest: &Manifest,
 ) -> Result<Vec<PathBuf>, String> {
@@ -454,7 +462,7 @@ fn legacy_custom_patches_to_remove(
         .map(|entry| entry.path.to_ascii_lowercase())
         .collect();
     let mut paths = Vec::new();
-    for relative in LEGACY_CUSTOM_PATCHES {
+    for relative in RETIRED_MANAGED_FILES {
         if manifest_paths.contains(&relative.to_ascii_lowercase()) {
             continue;
         }
@@ -463,11 +471,11 @@ fn legacy_custom_patches_to_remove(
             Ok(metadata) if metadata.is_file() && !is_link_or_reparse(&metadata) => {
                 paths.push(path)
             }
-            Ok(_) => return Err(format!("Ancien patch local non sûr : {}", path.display())),
+            Ok(_) => return Err(format!("Ancien fichier géré non sûr : {}", path.display())),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
                 return Err(format!(
-                    "Inspection de l’ancien patch {} impossible : {error}",
+                    "Inspection de l’ancien fichier géré {} impossible : {error}",
                     path.display()
                 ))
             }
@@ -1110,6 +1118,10 @@ mod tests {
         let paths = [
             "Wow.exe",
             "d3d9.dll",
+            "WarcraftXL.dll",
+            "Extensions/RivalsBeyond/RivalsBeyond.dll",
+            "Extensions/UnitOutline/UnitOutline.dll",
+            "Extensions/wxl-modern-m2/wxl-modern-m2.dll",
             "Data/common.MPQ",
             "Data/patch-C.mpq",
             "Data/patch-E.mpq",
@@ -1180,6 +1192,28 @@ mod tests {
         assert!(load_signed_manifest(&unsafe_document, key)
             .unwrap_err()
             .contains("Chemin client non sûr"));
+
+        let mut missing_outline = valid_manifest();
+        missing_outline
+            .files
+            .retain(|entry| entry.path != "Extensions/UnitOutline/UnitOutline.dll");
+        missing_outline.file_count = missing_outline.files.len();
+        missing_outline.total_size = missing_outline.files.len() as u64;
+        let (missing_document, key) = sign(&missing_outline);
+        assert!(load_signed_manifest(&missing_document, key)
+            .unwrap_err()
+            .contains("extensions/unitoutline/unitoutline.dll"));
+
+        let mut missing_modern_m2 = valid_manifest();
+        missing_modern_m2
+            .files
+            .retain(|entry| entry.path != "Extensions/wxl-modern-m2/wxl-modern-m2.dll");
+        missing_modern_m2.file_count = missing_modern_m2.files.len();
+        missing_modern_m2.total_size = missing_modern_m2.files.len() as u64;
+        let (missing_document, key) = sign(&missing_modern_m2);
+        assert!(load_signed_manifest(&missing_document, key)
+            .unwrap_err()
+            .contains("extensions/wxl-modern-m2/wxl-modern-m2.dll"));
     }
 
     #[test]
@@ -1263,36 +1297,44 @@ mod tests {
     }
 
     #[test]
-    fn legacy_custom_patches_are_removed_only_after_the_manifest_stops_listing_them() {
+    fn retired_managed_files_are_removed_only_after_the_manifest_stops_listing_them() {
         let root = TestDir::new();
+        let awesome = root.0.join("AwesomeWotlkLib.dll");
         let map_patch = root.0.join("Data/patch-4.MPQ");
         let locale_patch = root.0.join("Data/frFR/patch-frFR-4.MPQ");
         fs::create_dir_all(locale_patch.parent().unwrap()).unwrap();
+        fs::write(&awesome, b"retired runtime").unwrap();
         fs::write(&map_patch, b"map").unwrap();
         fs::write(&locale_patch, b"spells").unwrap();
         fs::write(root.0.join("Data/keep.MPQ"), b"keep").unwrap();
 
         let manifest = valid_manifest();
-        let paths = legacy_custom_patches_to_remove(&root.0, &manifest).unwrap();
-        assert_eq!(paths, vec![map_patch.clone(), locale_patch.clone()]);
-        remove_legacy_custom_patches(&paths).unwrap();
+        let paths = retired_managed_files_to_remove(&root.0, &manifest).unwrap();
+        assert_eq!(
+            paths,
+            vec![awesome.clone(), map_patch.clone(), locale_patch.clone()]
+        );
+        remove_retired_managed_files(&paths).unwrap();
+        assert!(!awesome.exists());
         assert!(!map_patch.exists());
         assert!(!locale_patch.exists());
         assert_eq!(fs::read(root.0.join("Data/keep.MPQ")).unwrap(), b"keep");
 
+        fs::write(&awesome, b"retired runtime").unwrap();
         fs::write(&map_patch, b"map").unwrap();
         fs::write(&locale_patch, b"spells").unwrap();
         let mut old_manifest = manifest;
-        for path in LEGACY_CUSTOM_PATCHES {
+        for path in RETIRED_MANAGED_FILES {
             old_manifest.files.push(FileEntry {
                 path: (*path).into(),
                 size: 1,
                 sha256: "00".repeat(32),
             });
         }
-        assert!(legacy_custom_patches_to_remove(&root.0, &old_manifest)
+        assert!(retired_managed_files_to_remove(&root.0, &old_manifest)
             .unwrap()
             .is_empty());
+        assert!(awesome.exists());
         assert!(map_patch.exists());
         assert!(locale_patch.exists());
         assert_eq!(fs::read(root.0.join("Data/keep.MPQ")).unwrap(), b"keep");
