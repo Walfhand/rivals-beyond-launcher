@@ -11,3 +11,6 @@ It makes HTTPS requests to the Rivals Beyond object-storage service to:
 These requests necessarily expose the user's IP address and standard HTTP metadata to the storage provider. The launcher does not upload account credentials, game settings, screenshots, logs, file contents or the selected installation path.
 
 The selected client directory and the last valid signed news response are stored locally. The launcher starts the locally installed game executable only after the user chooses **Play**.
+
+Account creation and news links open `rivalsbeyond.com` in the system browser only after an explicit
+click. The website's own privacy policy then applies.

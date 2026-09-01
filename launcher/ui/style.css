@@ -160,6 +160,38 @@ nav {
   flex: 1;
 }
 
+.account-link {
+  align-self: center;
+  min-height: 40px;
+  margin-right: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--gold-light);
+  background: var(--surface-raised);
+  font-family: var(--font-utility);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-instant) var(--ease-standard);
+}
+
+.account-link:hover {
+  border-color: var(--gold);
+  color: var(--ink);
+  background: var(--gold-light);
+}
+
+.account-link:active {
+  transform: scale(0.98);
+}
+
 .service-status {
   display: flex;
   gap: 9px;
@@ -366,7 +398,22 @@ h1 {
   min-height: 112px;
   overflow: hidden;
   border-right: 1px solid var(--line);
+  color: inherit;
   background: transparent;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.news-card:hover {
+  background: var(--surface-raised);
+}
+
+.news-card:hover h3 {
+  color: var(--gold-light);
+}
+
+.news-card:active {
+  background: #182532;
 }
 
 .news-card:first-child {

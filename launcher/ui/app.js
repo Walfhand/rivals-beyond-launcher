@@ -24,6 +24,7 @@ const errorDetail = document.querySelector("#error-detail");
 const AUTO_CHECK_INTERVAL = 10 * 60 * 1000;
 const CHECK_THROTTLE = 30 * 1000;
 const NEWS_CACHE_KEY = "moba-launcher-news";
+const NEWS_ARTICLE_BASE = "https://rivalsbeyond.com/fr/news/";
 const CLIENT_PATH_KEY = "moba-client-dir";
 const SCROLL_BEHAVIOR = window.matchMedia("(prefers-reduced-motion: reduce)").matches
   ? "auto"
@@ -206,9 +207,17 @@ function renderNews(feed) {
   document.querySelector("#hero-summary").textContent = feed.hero.summary;
   document.querySelector("#hero-cta").textContent = feed.hero.cta;
 
-  const cards = feed.items.slice(0, 3).map((item) => {
-    const card = document.createElement("article");
+  const items = feed.items
+    .filter((item) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.slug))
+    .slice(0, 3);
+  if (!items.length) return;
+
+  const cards = items.map((item) => {
+    const card = document.createElement("a");
     card.className = "news-card";
+    card.href = `${NEWS_ARTICLE_BASE}${item.slug}`;
+    card.target = "_blank";
+    card.rel = "noreferrer";
     const art = document.createElement("div");
     art.className = "news-art";
     art.setAttribute("aria-hidden", "true");

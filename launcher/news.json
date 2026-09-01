@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-30",
+  "updated_at": "2026-09-01",
   "hero": {
     "eyebrow": "SAISON 0 · LE SEUIL",
     "title": "Entrez dans le Seuil",
@@ -9,22 +9,25 @@
   },
   "items": [
     {
-      "category": "CARTE",
-      "title": "Le Sanctuaire",
-      "summary": "Découvrez le nouveau lobby hors match du Sanctuaire de l’Invocateur.",
-      "published_at": "2026-08-28"
+      "slug": "un-compte-site-et-jeu",
+      "category": "COMPTE",
+      "title": "Un seul compte relie le site et le jeu",
+      "summary": "La même adresse e-mail et le même mot de passe ouvrent désormais le compte web et le client Rivals Beyond.",
+      "published_at": "2026-08-31"
     },
     {
-      "category": "ÉVÉNEMENT",
-      "title": "Événement du boss",
-      "summary": "Coopérez avec l’équipe adverse, terrassez le boss puis disputez-vous son coffre.",
-      "published_at": "2026-08-28"
+      "slug": "le-projet-devient-rivals-beyond",
+      "category": "PROJET",
+      "title": "Le projet devient Rivals Beyond",
+      "summary": "Un nom, un logo fracturé et le Seuil relient enfin le jeu, le launcher et le site dans le même univers.",
+      "published_at": "2026-08-29"
     },
     {
-      "category": "CHAMPIONS",
-      "title": "10 champions jouables",
-      "summary": "Choisissez votre archétype et maîtrisez un kit pensé pour le combat MOBA.",
-      "published_at": "2026-08-28"
+      "slug": "pings-tactiques",
+      "category": "GAMEPLAY",
+      "title": "Cinq pings pour parler sans s’arrêter",
+      "summary": "Regarder, attaquer, danger, assistance et en chemin donnent une voix tactique immédiate à chaque équipe.",
+      "published_at": "2026-08-26"
     }
   ]
 }

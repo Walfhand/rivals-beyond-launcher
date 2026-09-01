@@ -19,6 +19,7 @@ pub struct NewsHero {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NewsItem {
+    pub slug: String,
     pub category: String,
     pub title: String,
     pub summary: String,
@@ -51,6 +52,9 @@ impl NewsFeed {
             validate_text(value, 240)?;
         }
         for item in &self.items {
+            if !valid_slug(&item.slug) {
+                return Err("Slug de nouveauté invalide.".into());
+            }
             validate_text(&item.category, 40)?;
             validate_text(&item.title, 100)?;
             validate_text(&item.summary, 320)?;
@@ -134,6 +138,17 @@ fn valid_date(value: &str) -> bool {
         })
 }
 
+fn valid_slug(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 100
+        && !value.starts_with('-')
+        && !value.ends_with('-')
+        && !value.contains("--")
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,6 +181,7 @@ mod tests {
                 cta: "Voir les nouveautés".into(),
             },
             items: vec![NewsItem {
+                slug: "le-sanctuaire".into(),
                 category: "CARTE".into(),
                 title: "Le Sanctuaire".into(),
                 summary: "Le nouveau lobby.".into(),
@@ -184,6 +200,13 @@ mod tests {
         assert!(load_signed_news(&tampered, key)
             .unwrap_err()
             .contains("Signature"));
+
+        let mut unsafe_feed = feed;
+        unsafe_feed.items[0].slug = "../register".into();
+        let (document, key) = signed(&unsafe_feed);
+        assert!(load_signed_news(&document, key)
+            .unwrap_err()
+            .contains("Slug"));
     }
 
     #[test]

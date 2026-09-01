@@ -44,15 +44,43 @@ class LauncherUiTest(unittest.TestCase):
         self.assertNotIn('id="update"', html)
         self.assertNotIn('id="play"', html)
 
+    def test_account_creation_opens_only_the_official_registration_page(self):
+        html = (ROOT / "ui/index.html").read_text()
+        main = (ROOT / "src-tauri/src/main.rs").read_text()
+        cargo = (ROOT / "src-tauri/Cargo.toml").read_text()
+        capability = json.loads((ROOT / "src-tauri/capabilities/default.json").read_text())
+
+        self.assertIn('href="https://rivalsbeyond.com/register"', html)
+        self.assertIn('target="_blank"', html)
+        self.assertIn('rel="noreferrer"', html)
+        self.assertIn('tauri-plugin-opener', cargo)
+        self.assertIn("tauri_plugin_opener::init()", main)
+        opener = next(
+            permission for permission in capability["permissions"]
+            if isinstance(permission, dict)
+            and permission["identifier"] == "opener:allow-open-url"
+        )
+        self.assertEqual(opener["allow"], [{"url": "https://rivalsbeyond.com/*"}])
+
     def test_news_are_remote_signed_cached_and_rendered_as_text(self):
         script = (ROOT / "ui/app.js").read_text()
         self.assertIn('invoke("launcher_news")', script)
         self.assertIn("moba-launcher-news", script)
         self.assertIn("textContent", script)
         self.assertNotIn("innerHTML", script)
+        self.assertIn('document.createElement("a")', script)
+        self.assertIn("https://rivalsbeyond.com/fr/news/", script)
         feed = json.loads((ROOT / "news.json").read_text())
         self.assertEqual(feed["schema_version"], 1)
         self.assertEqual(len(feed["items"]), 3)
+        self.assertEqual(
+            [item["slug"] for item in feed["items"]],
+            [
+                "un-compte-site-et-jeu",
+                "le-projet-devient-rivals-beyond",
+                "pings-tactiques",
+            ],
+        )
 
     def test_launcher_self_update_is_signed_and_runs_before_client_status(self):
         script = (ROOT / "ui/app.js").read_text()
