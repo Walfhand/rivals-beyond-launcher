@@ -23,6 +23,14 @@ const HTTP_ATTEMPTS: u32 = 4;
 const OBJECT_HOST: &str = "moba-data.nbg1.your-objectstorage.com";
 const DXVK_FILE: &str = "d3d9.dll";
 const DXVK_PARKED_FILE: &str = "d3d9.dll.dxvk";
+const VULKAN_API_1_3: u32 = (1 << 22) | (3 << 12);
+const DXVK_REQUIRED_EXTENSIONS: [&str; 5] = [
+    "VK_EXT_depth_clip_enable",
+    "VK_KHR_maintenance5",
+    "VK_KHR_maintenance6",
+    "VK_EXT_robustness2",
+    "VK_EXT_transform_feedback",
+];
 const REQUIRED_FILES: &[&str] = &[
     "wow.exe",
     "d3d9.dll",
@@ -418,10 +426,23 @@ fn manifest_file_matches(path: &Path, entry: &FileEntry) -> Result<bool, String>
     Ok(hash_file(path, |_| {})? == entry.sha256)
 }
 
+fn dxvk_device_compatible<'a>(
+    api_version: u32,
+    extensions: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    if api_version < VULKAN_API_1_3 {
+        return false;
+    }
+    let available: HashSet<_> = extensions.into_iter().collect();
+    DXVK_REQUIRED_EXTENSIONS
+        .iter()
+        .all(|required| available.contains(required))
+}
+
 #[cfg(windows)]
-pub fn vulkan_available() -> bool {
+pub fn dxvk_supported() -> bool {
     use libloading::{Library, Symbol};
-    use std::ffi::{c_char, c_void};
+    use std::ffi::{c_char, c_void, CStr};
 
     type VkInstance = *mut c_void;
     type VkCreateInstance = unsafe extern "system" fn(
@@ -432,6 +453,14 @@ pub fn vulkan_available() -> bool {
     type VkEnumeratePhysicalDevices =
         unsafe extern "system" fn(VkInstance, *mut u32, *mut VkInstance) -> i32;
     type VkDestroyInstance = unsafe extern "system" fn(VkInstance, *const c_void);
+    type VkGetPhysicalDeviceProperties =
+        unsafe extern "system" fn(VkInstance, *mut VkPhysicalDeviceProperties);
+    type VkEnumerateDeviceExtensionProperties = unsafe extern "system" fn(
+        VkInstance,
+        *const c_char,
+        *mut u32,
+        *mut VkExtensionProperties,
+    ) -> i32;
 
     #[repr(C)]
     struct VkApplicationInfo {
@@ -456,6 +485,16 @@ pub fn vulkan_available() -> bool {
         enabled_extension_names: *const *const c_char,
     }
 
+    #[repr(C, align(8))]
+    struct VkPhysicalDeviceProperties([u8; 1024]);
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct VkExtensionProperties {
+        extension_name: [c_char; 256],
+        spec_version: u32,
+    }
+
     unsafe {
         let library = match Library::new("vulkan-1.dll") {
             Ok(library) => library,
@@ -474,6 +513,16 @@ pub fn vulkan_available() -> bool {
             Ok(function) => function,
             Err(_) => return false,
         };
+        let get_properties: Symbol<VkGetPhysicalDeviceProperties> =
+            match library.get(b"vkGetPhysicalDeviceProperties\0") {
+                Ok(function) => function,
+                Err(_) => return false,
+            };
+        let enumerate_extensions: Symbol<VkEnumerateDeviceExtensionProperties> =
+            match library.get(b"vkEnumerateDeviceExtensionProperties\0") {
+                Ok(function) => function,
+                Err(_) => return false,
+            };
         let application = VkApplicationInfo {
             structure_type: 0,
             next: std::ptr::null(),
@@ -481,7 +530,7 @@ pub fn vulkan_available() -> bool {
             application_version: 1,
             engine_name: c"Rivals Launcher".as_ptr(),
             engine_version: 1,
-            api_version: 1 << 22,
+            api_version: VULKAN_API_1_3,
         };
         let create_info = VkInstanceCreateInfo {
             structure_type: 1,
@@ -498,14 +547,67 @@ pub fn vulkan_available() -> bool {
             return false;
         }
         let mut device_count = 0;
-        let result = enumerate(instance, &mut device_count, std::ptr::null_mut());
+        if enumerate(instance, &mut device_count, std::ptr::null_mut()) != 0 || device_count == 0 {
+            destroy(instance, std::ptr::null());
+            return false;
+        }
+        let mut devices = vec![std::ptr::null_mut(); device_count as usize];
+        if enumerate(instance, &mut device_count, devices.as_mut_ptr()) != 0 {
+            destroy(instance, std::ptr::null());
+            return false;
+        }
+        let supported = devices
+            .into_iter()
+            .take(device_count as usize)
+            .any(|device| {
+                let mut properties = VkPhysicalDeviceProperties([0; 1024]);
+                get_properties(device, &mut properties);
+                let api_version = u32::from_ne_bytes(properties.0[..4].try_into().unwrap());
+
+                let mut extension_count = 0;
+                if enumerate_extensions(
+                    device,
+                    std::ptr::null(),
+                    &mut extension_count,
+                    std::ptr::null_mut(),
+                ) != 0
+                    || extension_count == 0
+                {
+                    return false;
+                }
+                let empty = VkExtensionProperties {
+                    extension_name: [0; 256],
+                    spec_version: 0,
+                };
+                let mut extension_properties = vec![empty; extension_count as usize];
+                if enumerate_extensions(
+                    device,
+                    std::ptr::null(),
+                    &mut extension_count,
+                    extension_properties.as_mut_ptr(),
+                ) != 0
+                {
+                    return false;
+                }
+                dxvk_device_compatible(
+                    api_version,
+                    extension_properties
+                        .iter()
+                        .take(extension_count as usize)
+                        .filter_map(|property| {
+                            CStr::from_ptr(property.extension_name.as_ptr())
+                                .to_str()
+                                .ok()
+                        }),
+                )
+            });
         destroy(instance, std::ptr::null());
-        result == 0 && device_count > 0
+        supported
     }
 }
 
 #[cfg(not(windows))]
-pub fn vulkan_available() -> bool {
+pub fn dxvk_supported() -> bool {
     false
 }
 
@@ -1561,6 +1663,22 @@ mod tests {
             fs::read(root.0.join(DXVK_FILE)).unwrap(),
             b"user supplied wrapper"
         );
+    }
+
+    #[test]
+    fn dxvk_27_requires_vulkan_13_and_every_required_device_extension() {
+        let all_extensions = DXVK_REQUIRED_EXTENSIONS.iter().copied();
+        assert!(dxvk_device_compatible(VULKAN_API_1_3, all_extensions));
+        assert!(!dxvk_device_compatible(
+            VULKAN_API_1_3 - 1,
+            DXVK_REQUIRED_EXTENSIONS.iter().copied()
+        ));
+        assert!(!dxvk_device_compatible(
+            VULKAN_API_1_3,
+            DXVK_REQUIRED_EXTENSIONS[..DXVK_REQUIRED_EXTENSIONS.len() - 1]
+                .iter()
+                .copied()
+        ));
     }
 
     #[test]

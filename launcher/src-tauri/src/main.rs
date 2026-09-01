@@ -251,7 +251,7 @@ async fn launch_game(app: tauri::AppHandle, client_dir: String) -> Result<(), La
         if !updater::client_status_against_manifest(&root, &loaded)?.can_launch {
             return Err("Mise à jour obligatoire avant de jouer.".into());
         }
-        updater::configure_graphics_backend(&root, &loaded.manifest, updater::vulkan_available())?;
+        updater::configure_graphics_backend(&root, &loaded.manifest, updater::dxvk_supported())?;
         let wow = updater::wow_path(&root)?;
         let mut child = Command::new(wow)
             .current_dir(root)

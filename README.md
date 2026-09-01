@@ -10,10 +10,10 @@ The header opens the official account form at `https://rivalsbeyond.com/register
 the latest published French articles and open their canonical pages on `rivalsbeyond.com` in the
 system browser; Tauri's opener permission is scoped to that origin only.
 
-At launch, the Windows binary probes the Vulkan loader and enumerates physical devices. When none is
-usable, it atomically parks the managed DXVK wrapper as `d3d9.dll.dxvk` so Windows or Wine loads its
-system D3D9 implementation. The parked file still satisfies repair scans and is restored automatically
-when Vulkan becomes available.
+At launch, the Windows binary checks physical devices against DXVK 2.7's Vulkan 1.3 and required
+extension contract. When none qualifies, it atomically parks the managed DXVK wrapper as
+`d3d9.dll.dxvk` so Windows or Wine loads its system D3D9 implementation. The parked file still
+satisfies repair scans and is restored automatically when a compatible device becomes available.
 
 The game-client manifest is composed and signed outside this public repository. The updater currently
 requires `WarcraftXL.dll`, `Extensions/RivalsBeyond/RivalsBeyond.dll` and the pinned
