@@ -25,6 +25,10 @@ runtime as a fallback.
 WarcraftXL Hub is not part of the launcher. Install the pinned core and extensions directly
 from the signed game manifest; do not add its community store, profiles or a second updater.
 
+`d3d9.dll` is the managed DXVK payload. Before launching, the updater probes Vulkan: without a usable
+physical device it moves the exact manifest file to `d3d9.dll.dxvk`, and repair treats that parked
+copy as present. With Vulkan it restores the file. Never overwrite an unknown wrapper at either path.
+
 Run the updater tests after changing this contract:
 
 ```bash

@@ -21,6 +21,8 @@ const MAX_MANIFEST_FILES: usize = 100_000;
 const HTTP_MANIFEST_TIMEOUT: Duration = Duration::from_secs(60);
 const HTTP_ATTEMPTS: u32 = 4;
 const OBJECT_HOST: &str = "moba-data.nbg1.your-objectstorage.com";
+const DXVK_FILE: &str = "d3d9.dll";
+const DXVK_PARKED_FILE: &str = "d3d9.dll.dxvk";
 const REQUIRED_FILES: &[&str] = &[
     "wow.exe",
     "d3d9.dll",
@@ -349,6 +351,164 @@ pub fn wow_path(root: &Path) -> Result<PathBuf, String> {
     Ok(wow)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GraphicsBackend {
+    Dxvk,
+    SystemD3d9,
+}
+
+pub fn configure_graphics_backend(
+    root: &Path,
+    manifest: &Manifest,
+    use_dxvk: bool,
+) -> Result<GraphicsBackend, String> {
+    validate_root(root)?;
+    let entry = manifest
+        .files
+        .iter()
+        .find(|entry| entry.path.eq_ignore_ascii_case(DXVK_FILE))
+        .ok_or_else(|| "Le manifeste ne contient pas le runtime DXVK.".to_string())?;
+    let active = target_path(root, DXVK_FILE, false)?;
+    let parked = target_path(root, DXVK_PARKED_FILE, false)?;
+    let active_exists = regular_file_size(&active)?.is_some();
+    let parked_exists = regular_file_size(&parked)?.is_some();
+    let active_matches = manifest_file_matches(&active, entry)?;
+    let parked_matches = manifest_file_matches(&parked, entry)?;
+
+    if active_exists && !active_matches {
+        return Err("Un d3d9.dll inconnu empêche la sélection graphique automatique.".into());
+    }
+    if parked_exists && !parked_matches && !active_matches {
+        return Err("Le DXVK mis de côté est inconnu. Lance une réparation du client.".into());
+    }
+
+    if use_dxvk {
+        if active_matches {
+            return Ok(GraphicsBackend::Dxvk);
+        }
+        if parked_matches {
+            atomic_replace(&parked, &active)?;
+            return Ok(GraphicsBackend::Dxvk);
+        }
+        return Err("DXVK est absent. Lance une réparation du client.".into());
+    }
+
+    if parked_matches {
+        if active_matches {
+            fs::remove_file(&active).map_err(|error| {
+                format!(
+                    "Désactivation de DXVK impossible ({}): {error}",
+                    active.display()
+                )
+            })?;
+        }
+        return Ok(GraphicsBackend::SystemD3d9);
+    }
+    if active_matches {
+        atomic_replace(&active, &parked)?;
+        return Ok(GraphicsBackend::SystemD3d9);
+    }
+    Err("DXVK est absent. Lance une réparation du client.".into())
+}
+
+fn manifest_file_matches(path: &Path, entry: &FileEntry) -> Result<bool, String> {
+    if regular_file_size(path)? != Some(entry.size) {
+        return Ok(false);
+    }
+    Ok(hash_file(path, |_| {})? == entry.sha256)
+}
+
+#[cfg(windows)]
+pub fn vulkan_available() -> bool {
+    use libloading::{Library, Symbol};
+    use std::ffi::{c_char, c_void};
+
+    type VkInstance = *mut c_void;
+    type VkCreateInstance = unsafe extern "system" fn(
+        *const VkInstanceCreateInfo,
+        *const c_void,
+        *mut VkInstance,
+    ) -> i32;
+    type VkEnumeratePhysicalDevices =
+        unsafe extern "system" fn(VkInstance, *mut u32, *mut VkInstance) -> i32;
+    type VkDestroyInstance = unsafe extern "system" fn(VkInstance, *const c_void);
+
+    #[repr(C)]
+    struct VkApplicationInfo {
+        structure_type: u32,
+        next: *const c_void,
+        application_name: *const c_char,
+        application_version: u32,
+        engine_name: *const c_char,
+        engine_version: u32,
+        api_version: u32,
+    }
+
+    #[repr(C)]
+    struct VkInstanceCreateInfo {
+        structure_type: u32,
+        next: *const c_void,
+        flags: u32,
+        application_info: *const VkApplicationInfo,
+        enabled_layer_count: u32,
+        enabled_layer_names: *const *const c_char,
+        enabled_extension_count: u32,
+        enabled_extension_names: *const *const c_char,
+    }
+
+    unsafe {
+        let library = match Library::new("vulkan-1.dll") {
+            Ok(library) => library,
+            Err(_) => return false,
+        };
+        let create: Symbol<VkCreateInstance> = match library.get(b"vkCreateInstance\0") {
+            Ok(function) => function,
+            Err(_) => return false,
+        };
+        let enumerate: Symbol<VkEnumeratePhysicalDevices> =
+            match library.get(b"vkEnumeratePhysicalDevices\0") {
+                Ok(function) => function,
+                Err(_) => return false,
+            };
+        let destroy: Symbol<VkDestroyInstance> = match library.get(b"vkDestroyInstance\0") {
+            Ok(function) => function,
+            Err(_) => return false,
+        };
+        let application = VkApplicationInfo {
+            structure_type: 0,
+            next: std::ptr::null(),
+            application_name: c"Rivals Beyond".as_ptr(),
+            application_version: 1,
+            engine_name: c"Rivals Launcher".as_ptr(),
+            engine_version: 1,
+            api_version: 1 << 22,
+        };
+        let create_info = VkInstanceCreateInfo {
+            structure_type: 1,
+            next: std::ptr::null(),
+            flags: 0,
+            application_info: &application,
+            enabled_layer_count: 0,
+            enabled_layer_names: std::ptr::null(),
+            enabled_extension_count: 0,
+            enabled_extension_names: std::ptr::null(),
+        };
+        let mut instance = std::ptr::null_mut();
+        if create(&create_info, std::ptr::null(), &mut instance) != 0 || instance.is_null() {
+            return false;
+        }
+        let mut device_count = 0;
+        let result = enumerate(instance, &mut device_count, std::ptr::null_mut());
+        destroy(instance, std::ptr::null());
+        result == 0 && device_count > 0
+    }
+}
+
+#[cfg(not(windows))]
+pub fn vulkan_available() -> bool {
+    false
+}
+
 pub fn update_client<F>(
     client: &Client,
     root: &Path,
@@ -496,7 +656,13 @@ where
     let mut changed = Vec::new();
     let mut completed_bytes = 0u64;
     for (index, entry) in manifest.files.iter().enumerate() {
-        let target = target_path(root, &entry.path, false)?;
+        let mut target = target_path(root, &entry.path, false)?;
+        if entry.path.eq_ignore_ascii_case(DXVK_FILE) && regular_file_size(&target)?.is_none() {
+            let parked = target_path(root, DXVK_PARKED_FILE, false)?;
+            if regular_file_size(&parked)?.is_some() {
+                target = parked;
+            }
+        }
         let size = regular_file_size(&target)?;
         let matches = if size == Some(entry.size) {
             if trust_sizes {
@@ -1338,6 +1504,63 @@ mod tests {
         assert!(map_patch.exists());
         assert!(locale_patch.exists());
         assert_eq!(fs::read(root.0.join("Data/keep.MPQ")).unwrap(), b"keep");
+    }
+
+    #[test]
+    fn dxvk_is_parked_without_vulkan_and_still_satisfies_manifest_repair() {
+        let root = TestDir::new();
+        let dxvk = b"pinned dxvk d3d9";
+        let entry = FileEntry {
+            path: DXVK_FILE.into(),
+            size: dxvk.len() as u64,
+            sha256: sha256_bytes(dxvk),
+        };
+        let mut manifest = valid_manifest();
+        manifest.files = vec![entry.clone()];
+        manifest.file_count = 1;
+        manifest.total_size = entry.size;
+        fs::write(root.0.join(DXVK_FILE), dxvk).unwrap();
+
+        assert_eq!(
+            configure_graphics_backend(&root.0, &manifest, false).unwrap(),
+            GraphicsBackend::SystemD3d9
+        );
+        assert!(!root.0.join(DXVK_FILE).exists());
+        assert_eq!(fs::read(root.0.join(DXVK_PARKED_FILE)).unwrap(), dxvk);
+        assert!(scan(&root.0, &manifest, false, &mut |_| {})
+            .unwrap()
+            .is_empty());
+
+        assert_eq!(
+            configure_graphics_backend(&root.0, &manifest, true).unwrap(),
+            GraphicsBackend::Dxvk
+        );
+        assert_eq!(fs::read(root.0.join(DXVK_FILE)).unwrap(), dxvk);
+        assert!(!root.0.join(DXVK_PARKED_FILE).exists());
+    }
+
+    #[test]
+    fn graphics_selection_refuses_to_replace_an_unknown_d3d9_wrapper() {
+        let root = TestDir::new();
+        let dxvk = b"pinned dxvk d3d9";
+        let entry = FileEntry {
+            path: DXVK_FILE.into(),
+            size: dxvk.len() as u64,
+            sha256: sha256_bytes(dxvk),
+        };
+        let mut manifest = valid_manifest();
+        manifest.files = vec![entry.clone()];
+        manifest.file_count = 1;
+        manifest.total_size = entry.size;
+        fs::write(root.0.join(DXVK_FILE), b"user supplied wrapper").unwrap();
+
+        assert!(configure_graphics_backend(&root.0, &manifest, false)
+            .unwrap_err()
+            .contains("inconnu"));
+        assert_eq!(
+            fs::read(root.0.join(DXVK_FILE)).unwrap(),
+            b"user supplied wrapper"
+        );
     }
 
     #[test]

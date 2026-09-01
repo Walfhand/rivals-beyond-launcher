@@ -478,9 +478,6 @@ repairButton.addEventListener("click", () => {
 primaryButton.addEventListener("click", primaryAction);
 settingsButton.addEventListener("click", openSettings);
 moreButton.addEventListener("click", openSettings);
-document.querySelector("#hero-cta").addEventListener("click", () => {
-  document.querySelector("#news")?.scrollIntoView({ behavior: SCROLL_BEHAVIOR, block: "nearest" });
-});
 document.querySelectorAll("[data-scroll]").forEach((button) => {
   button.addEventListener("click", scrollToSection);
 });

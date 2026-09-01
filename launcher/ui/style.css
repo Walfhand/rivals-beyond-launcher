@@ -342,6 +342,12 @@ h1 {
     transform var(--duration-instant) var(--ease-standard);
 }
 
+.outline-button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .outline-button:hover,
 .secondary-button:hover:not(:disabled) {
   border-color: var(--gold-light);

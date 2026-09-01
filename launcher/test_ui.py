@@ -38,8 +38,12 @@ class LauncherUiTest(unittest.TestCase):
 
     def test_home_has_news_and_one_contextual_primary_action(self):
         html = (ROOT / "ui/index.html").read_text()
+        script = (ROOT / "ui/app.js").read_text()
         self.assertIn('id="news"', html)
         self.assertIn('id="news-grid"', html)
+        self.assertIn('id="hero-cta" class="outline-button"', html)
+        self.assertIn('href="https://rivalsbeyond.com/fr/news"', html)
+        self.assertNotIn('document.querySelector("#hero-cta").addEventListener', script)
         self.assertEqual(html.count('id="primary-action"'), 1)
         self.assertNotIn('id="update"', html)
         self.assertNotIn('id="play"', html)
