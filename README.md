@@ -2,28 +2,23 @@
 
 [![Build Windows launcher](https://github.com/Walfhand/rivals-beyond-launcher/actions/workflows/launcher-windows.yml/badge.svg)](https://github.com/Walfhand/rivals-beyond-launcher/actions/workflows/launcher-windows.yml)
 
-Public, reproducible source for the Windows launcher of **Rivals Beyond**.
+**Rivals Beyond Launcher** is the open-source Windows launcher for
+[Rivals Beyond](https://rivalsbeyond.com/fr), a community project that transforms WoW 3.3.5a into a
+MOBA. It installs, repairs, updates and starts the game client from cryptographically signed manifests.
 
-The launcher installs, repairs and starts the game client from signed manifests. It also updates itself from immutable, signed NSIS releases. This repository contains the launcher and its visual assets; it does not contain the game client, server, accounts or private signing keys.
+## What it does
 
-The header opens the official account form at `https://rivalsbeyond.com/register`. News cards mirror
-the latest published French articles and open their canonical pages on `rivalsbeyond.com` in the
-system browser; Tauri's opener permission is scoped to that origin only.
+- Preserves user-owned files while installing and repairing the managed game client.
+- Verifies and applies signed launcher updates before game-client updates.
+- Uses DXVK only when the system meets its Vulkan requirements, otherwise falling back to system D3D9.
+- Links directly to the official account registration and Rivals Beyond news.
 
-At launch, the Windows binary checks physical devices against DXVK 2.7's Vulkan 1.3 and required
-extension contract. When none qualifies, it atomically parks the managed DXVK wrapper as
-`d3d9.dll.dxvk` so Windows or Wine loads its system D3D9 implementation. The parked file still
-satisfies repair scans and is restored automatically when a compatible device becomes available.
+This repository contains the launcher source, interface, packaging and CI configuration. It does not
+contain the game client, server, accounts or private signing keys.
 
-The game-client manifest is composed and signed outside this public repository. The updater currently
-requires `WarcraftXL.dll`, `Extensions/RivalsBeyond/RivalsBeyond.dll` and the pinned
-`Extensions/UnitOutline/UnitOutline.dll` plus `Extensions/wxl-modern-m2/wxl-modern-m2.dll`, which
-owns the M2 draw event Unit Outline consumes; after installing that payload
-it removes the retired `AwesomeWotlkLib.dll`. No private signing material is needed to build or test
-this behavior.
-
-Release launcher `0.3.2` before publishing the first WarcraftXL game manifest. Launcher self-update
-runs before the game-client update, which guarantees the retired DLL cleanup code is present first.
+- [Official website](https://rivalsbeyond.com/fr)
+- [Create an account](https://rivalsbeyond.com/register)
+- [Download the latest release](https://github.com/Walfhand/rivals-beyond-launcher/releases/latest)
 
 ## Build and test
 
@@ -44,7 +39,7 @@ Windows NSIS installers are built from this repository by [GitHub Actions](.gith
 - [Privacy policy](PRIVACY.md)
 - [Security policy](SECURITY.md)
 
-The Tauri updater signature authenticates automatic updates. Authenticode signing through SignPath Foundation is pending project approval.
+The Tauri updater signature authenticates automatic updates.
 
 ## License
 
