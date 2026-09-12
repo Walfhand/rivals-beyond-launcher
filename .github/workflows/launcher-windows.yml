@@ -58,6 +58,17 @@ jobs:
           uploadUpdaterSignatures: true
           updaterJsonPreferNsis: true
 
+      - name: Verify the installer includes the offline WebView2 dependency
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "launcher/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer not found" }
+          $listing = & 7z l -slt "$($installer.FullName)"
+          if ($LASTEXITCODE -ne 0) { throw "Cannot inspect NSIS installer" }
+          if (-not ($listing -match 'Path = .*MicrosoftEdgeWebView2RuntimeInstaller\.exe$')) {
+            throw "Offline WebView2 installer is missing from the package"
+          }
+
       - name: Verify updater signature against the tracked public key
         shell: pwsh
         run: |

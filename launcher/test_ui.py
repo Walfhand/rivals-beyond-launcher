@@ -111,6 +111,13 @@ class LauncherUiTest(unittest.TestCase):
         self.assertIn("default: moba.rivalsbeyond.com", realm_input)
         self.assertIn("MOBA_REALM_ADDRESS: ${{ inputs.realm_address }}", workflow)
 
+    def test_windows_installer_bundles_webview2_without_a_separate_download(self):
+        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
+        self.assertEqual(
+            tauri["bundle"]["windows"]["webviewInstallMode"],
+            {"type": "offlineInstaller", "silent": True},
+        )
+
     def test_tauri_and_cargo_versions_stay_aligned(self):
         tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
         cargo = tomllib.loads((ROOT / "src-tauri/Cargo.toml").read_text())

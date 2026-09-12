@@ -10,6 +10,8 @@ MOBA. It installs, repairs, updates and starts the game client from cryptographi
 
 - Preserves user-owned files while installing and repairing the managed game client.
 - Verifies and applies signed launcher updates before game-client updates.
+- Includes the full Microsoft WebView2 installer and installs it silently when missing, without
+  a separate dependency download during setup.
 - Uses DXVK only when the system meets its Vulkan requirements, otherwise falling back to system D3D9.
 - Defaults the in-game tutorial to off before launch when `WTF/Config.wtf` has no `showTutorials`
   setting, preserving existing preferences and all other client settings.
