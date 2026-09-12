@@ -25,7 +25,7 @@ const NEWS_URL: &str = match option_env!("MOBA_NEWS_URL") {
 };
 const REALM_ADDRESS: &str = match option_env!("MOBA_REALM_ADDRESS") {
     Some(value) => value,
-    None => "127.0.0.1",
+    None => "moba.rivalsbeyond.com",
 };
 
 struct Busy(AtomicBool);
@@ -253,6 +253,11 @@ async fn launch_game(app: tauri::AppHandle, client_dir: String) -> Result<(), La
         }
         updater::configure_graphics_backend(&root, &loaded.manifest, updater::dxvk_supported())?;
         let wow = updater::wow_path(&root)?;
+        let screen = worker_app.primary_monitor().ok().flatten().map(|monitor| {
+            let size = monitor.size();
+            (size.width, size.height)
+        });
+        updater::configure_client_defaults(&root, screen)?;
         let mut child = Command::new(wow)
             .current_dir(root)
             .spawn()

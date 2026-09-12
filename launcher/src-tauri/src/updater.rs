@@ -1223,6 +1223,52 @@ fn download_part_path(path: &Path, sha256: &str) -> PathBuf {
     sidecar_path(path, &format!(".moba.part.{sha256}"))
 }
 
+pub fn configure_client_defaults(root: &Path, screen: Option<(u32, u32)>) -> Result<(), String> {
+    validate_root(root)?;
+    let path = target_path(root, "WTF/Config.wtf", true)?;
+    let mut config = match fs::read(&path) {
+        Ok(config) => config,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => {
+            return Err(format!(
+                "Lecture de {} impossible : {error}",
+                path.display()
+            ))
+        }
+    };
+    let original_len = config.len();
+    append_config_default(&mut config, "showTutorials", "0");
+    if let Some((width, height)) = screen.filter(|(width, height)| *width > 0 && *height > 0) {
+        append_config_default(&mut config, "gxResolution", &format!("{width}x{height}"));
+    }
+    if config.len() == original_len {
+        return Ok(());
+    }
+    atomic_write(&path, &config)
+}
+
+fn append_config_default(config: &mut Vec<u8>, name: &str, value: &str) {
+    // Keep the client's original encoding and every explicitly saved preference.
+    let content = config.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&config);
+    if content.split(|byte| *byte == b'\n').any(|line| {
+        let mut words = line
+            .split(u8::is_ascii_whitespace)
+            .filter(|word| !word.is_empty());
+        words
+            .next()
+            .is_some_and(|word| word.eq_ignore_ascii_case(b"SET"))
+            && words
+                .next()
+                .is_some_and(|word| word.eq_ignore_ascii_case(name.as_bytes()))
+    }) {
+        return;
+    }
+    if !config.is_empty() && !config.ends_with(b"\n") {
+        config.extend_from_slice(b"\r\n");
+    }
+    config.extend_from_slice(format!("SET {name} \"{value}\"\r\n").as_bytes());
+}
+
 fn write_realmlist(root: &Path, realm_address: &str) -> Result<(), String> {
     let path = target_path(root, "Data/frFR/realmlist.wtf", true)?;
     atomic_write(
@@ -1379,6 +1425,56 @@ mod tests {
     impl Drop for TestDir {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn tutorials_default_to_off_without_replacing_player_settings() {
+        let root = TestDir::new();
+        let path = root.0.join("WTF/Config.wtf");
+        configure_client_defaults(&root.0, None).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"SET showTutorials \"0\"\r\n");
+
+        for original in [
+            b"SET gxResolution \"2560x1440\"".as_slice(),
+            b"SET accountName \"\xff\"\r\n",
+            b"SET showTutorials \"0\"\r\n",
+            b"  set\tSHOWTUTORIALS \"1\"\nSET gxResolution \"1920x1080\"\n",
+        ] {
+            fs::write(&path, original).unwrap();
+            configure_client_defaults(&root.0, None).unwrap();
+            let configured = fs::read(&path).unwrap();
+            assert!(configured.starts_with(original));
+            if original.starts_with(b"SET showTutorials") || original.starts_with(b"  set") {
+                assert_eq!(configured, original);
+            } else {
+                assert!(configured.ends_with(b"\nSET showTutorials \"0\"\r\n"));
+            }
+            configure_client_defaults(&root.0, None).unwrap();
+            assert_eq!(fs::read(&path).unwrap(), configured);
+        }
+    }
+
+    #[test]
+    fn new_clients_use_screen_pixels_and_keep_saved_preferences_on_later_launches() {
+        let root = TestDir::new();
+        let path = root.0.join("WTF/Config.wtf");
+        for screen in [None, Some((0, 1440)), Some((2560, 0))] {
+            configure_client_defaults(&root.0, screen).unwrap();
+            assert_eq!(fs::read(&path).unwrap(), b"SET showTutorials \"0\"\r\n");
+        }
+        configure_client_defaults(&root.0, Some((2560, 1440))).unwrap();
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            b"SET showTutorials \"0\"\r\nSET gxResolution \"2560x1440\"\r\n"
+        );
+        for original in [
+            b"SET gxResolution \"1920x1080\"\nSET showTutorials \"1\"\n".as_slice(),
+            b"\xef\xbb\xbfset GXRESOLUTION \"1920x1080\"\nSET showTutorials \"1\"\n",
+        ] {
+            fs::write(&path, original).unwrap();
+            configure_client_defaults(&root.0, Some((3840, 2160))).unwrap();
+            assert_eq!(fs::read(&path).unwrap(), original);
         }
     }
 

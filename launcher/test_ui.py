@@ -101,6 +101,16 @@ class LauncherUiTest(unittest.TestCase):
         )
         self.assertEqual(updater["windows"]["installMode"], "passive")
 
+    def test_windows_build_defaults_to_the_public_game_realm(self):
+        main = (ROOT / "src-tauri/src/main.rs").read_text()
+        workflow = (ROOT.parent / ".github/workflows/launcher-windows.yml").read_text()
+        realm = main.split("const REALM_ADDRESS:", 1)[1].split("};", 1)[0]
+        self.assertIn('option_env!("MOBA_REALM_ADDRESS")', realm)
+        self.assertIn('None => "moba.rivalsbeyond.com"', realm)
+        realm_input = workflow.split("      realm_address:", 1)[1].split("      manifest_url:", 1)[0]
+        self.assertIn("default: moba.rivalsbeyond.com", realm_input)
+        self.assertIn("MOBA_REALM_ADDRESS: ${{ inputs.realm_address }}", workflow)
+
     def test_tauri_and_cargo_versions_stay_aligned(self):
         tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
         cargo = tomllib.loads((ROOT / "src-tauri/Cargo.toml").read_text())

@@ -11,6 +11,10 @@ MOBA. It installs, repairs, updates and starts the game client from cryptographi
 - Preserves user-owned files while installing and repairing the managed game client.
 - Verifies and applies signed launcher updates before game-client updates.
 - Uses DXVK only when the system meets its Vulkan requirements, otherwise falling back to system D3D9.
+- Defaults the in-game tutorial to off before launch when `WTF/Config.wtf` has no `showTutorials`
+  setting, preserving existing preferences and all other client settings.
+- Initializes a missing `gxResolution` from the primary monitor's physical pixel dimensions.
+  Saved resolutions stay unchanged; if monitor detection fails, the game chooses its own default.
 - Links directly to the official account registration and Rivals Beyond news.
 
 This repository contains the launcher source, interface, packaging and CI configuration. It does not
@@ -32,6 +36,9 @@ python3 -m unittest \
 ```
 
 Windows NSIS installers are built from this repository by [GitHub Actions](.github/workflows/launcher-windows.yml). The workflow tests the Rust updater and release tooling, builds the installer, verifies its Tauri updater signature and uploads the resulting artifacts.
+
+Builds default to the game realm `moba.rivalsbeyond.com`. The workflow's `realm_address` input
+sets `MOBA_REALM_ADDRESS` at compile time; local builds can override the same environment variable.
 
 ## Security and privacy
 

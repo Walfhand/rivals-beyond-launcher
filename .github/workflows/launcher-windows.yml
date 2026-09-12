@@ -6,6 +6,7 @@ on:
       realm_address:
         description: Realm hostname or IP written to realmlist.wtf
         required: true
+        default: moba.rivalsbeyond.com
       manifest_url:
         description: Signed client manifest URL
         required: true
