@@ -42,6 +42,24 @@ Windows NSIS installers are built from this repository by [GitHub Actions](.gith
 Builds default to the game realm `moba.rivalsbeyond.com`. The workflow's `realm_address` input
 sets `MOBA_REALM_ADDRESS` at compile time; local builds can override the same environment variable.
 
+## Automatic client diagnostics
+
+Automatic Sentry delivery is enabled by default; the settings checkbox remembers a player's opt-out.
+`launcher/src-tauri/src/diagnostics.rs` relays the game's bounded `Logs/RivalsDiagnostics*.jsonl`
+journals, captures WarcraftXL warnings/errors and records successful game starts, duration and exit
+status. Network delivery runs on a separate worker. The game build must include the matching native
+collector and FrameXML from the private game repository; `make client` alone does not start this relay.
+
+In Sentry, filter `kind:game_started environment:production` for launch counts, `kind:client_crash`
+for abnormal exits, `component:world_entry` for minimap/HUD checkpoints or `component:champion_gallery`
+for window layering. Use `client_version` and the ephemeral `session` tag to correlate events. These
+are Sentry events/issues rather than an unbounded stream of raw logs; quotas and local rotation mean
+counts can be incomplete. No unique-player count is collected.
+
+Tests: `cargo test --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --lib`.
+An explicit smoke test sends one synthetic development event to the configured project:
+`cargo run --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --example diagnostics_smoke -- --send`.
+
 ## Security and privacy
 
 - [Code signing policy](CODE_SIGNING_POLICY.md)

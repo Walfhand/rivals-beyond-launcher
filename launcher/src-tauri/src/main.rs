@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use moba_launcher_core::{news, updater, LauncherError};
+use moba_launcher_core::{diagnostics, news, updater, LauncherError};
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
@@ -237,7 +237,11 @@ async fn update_client(
 }
 
 #[tauri::command]
-async fn launch_game(app: tauri::AppHandle, client_dir: String) -> Result<(), LauncherError> {
+async fn launch_game(
+    app: tauri::AppHandle,
+    client_dir: String,
+    diagnostics_enabled: bool,
+) -> Result<(), LauncherError> {
     if app.state::<Busy>().0.swap(true, Ordering::AcqRel) {
         return Err(LauncherError::from(
             "Une opération est déjà en cours.".to_string(),
@@ -258,15 +262,27 @@ async fn launch_game(app: tauri::AppHandle, client_dir: String) -> Result<(), La
             (size.width, size.height)
         });
         updater::configure_client_defaults(&root, screen)?;
+        let session = diagnostics::new_session();
         let mut child = Command::new(wow)
-            .current_dir(root)
+            .current_dir(&root)
+            .env("MOBA_CLIENT_VERSION", &loaded.manifest.client_version)
+            .env("MOBA_DIAGNOSTIC_SESSION", &session)
+            .env(
+                "MOBA_DIAGNOSTICS_UPLOAD",
+                if diagnostics_enabled { "1" } else { "0" },
+            )
             .spawn()
             .map_err(|error| format!("Lancement de Wow.exe impossible : {error}"))?;
         let _ = worker_app.emit("game-started", ());
-        let result = child
-            .wait()
-            .map(|_| ())
-            .map_err(|error| format!("Suivi de Wow.exe impossible : {error}"));
+        let result = diagnostics::watch_game(
+            &mut child,
+            &root,
+            &loaded.manifest,
+            diagnostics_enabled,
+            &session,
+        )
+        .map(|_| ())
+        .map_err(|error| format!("Suivi de Wow.exe impossible : {error}"));
         worker_app.state::<Busy>().0.store(false, Ordering::Release);
         let _ = worker_app.emit("game-exited", ());
         result

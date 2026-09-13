@@ -148,6 +148,15 @@
           Les paramètres, captures d’écran, addons et fichiers personnels sont conservés.
         </p>
 
+        <label class="diagnostics-setting" for="diagnostics-enabled">
+          <input id="diagnostics-enabled" type="checkbox" checked aria-describedby="diagnostics-help">
+          Envoyer automatiquement les diagnostics techniques
+        </label>
+        <p id="diagnostics-help" class="setting-help">
+          Sentry reçoit les erreurs, les versions du client et les lancements du jeu.
+          Activé par défaut, sans collecte des chats ni fichiers de compte.
+        </p>
+
         <div class="dialog-actions">
           <button id="repair" class="secondary-button" type="button" disabled>
             Vérifier et réparer

@@ -8,6 +8,17 @@ ROOT = Path(__file__).resolve().parent
 
 
 class LauncherUiTest(unittest.TestCase):
+    def test_automatic_diagnostics_preference_is_disclosed_and_passed_to_the_game_launch(self):
+        html = (ROOT / "ui/index.html").read_text()
+        script = (ROOT / "ui/app.js").read_text()
+        main = (ROOT / "src-tauri/src/main.rs").read_text()
+        self.assertIn('id="diagnostics-enabled" type="checkbox" checked', html)
+        self.assertIn('aria-describedby="diagnostics-help"', html)
+        self.assertIn('diagnosticsEnabled: diagnosticsToggle.checked', script)
+        self.assertIn('localStorage.setItem(DIAGNOSTICS_KEY', script)
+        self.assertIn('"MOBA_DIAGNOSTICS_UPLOAD"', main)
+        self.assertIn('"MOBA_DIAGNOSTIC_SESSION"', main)
+
     def test_launcher_uses_the_rivals_beyond_brand(self):
         html = (ROOT / "ui/index.html").read_text()
         script = (ROOT / "ui/app.js").read_text()

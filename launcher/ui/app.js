@@ -9,6 +9,8 @@ const primaryButton = document.querySelector("#primary-action");
 const settingsButton = document.querySelector("#settings");
 const moreButton = document.querySelector("#more-options");
 const settingsDialog = document.querySelector("#settings-dialog");
+const diagnosticsToggle = document.querySelector("#diagnostics-enabled");
+const DIAGNOSTICS_KEY = "rivals-diagnostics-enabled";
 const statusText = document.querySelector("#client-status");
 const statusKicker = document.querySelector("#status-kicker");
 const detailText = document.querySelector("#progress-detail");
@@ -340,7 +342,7 @@ async function play() {
   renderState({ ...previous, state: "game_running" });
   setBusy(true);
   try {
-    await invoke("launch_game", { clientDir: pathInput.value });
+    await invoke("launch_game", { clientDir: pathInput.value, diagnosticsEnabled: diagnosticsToggle.checked });
   } catch (error) {
     showError(error, "play");
   } finally {
@@ -483,6 +485,10 @@ document.querySelectorAll("[data-scroll]").forEach((button) => {
 });
 
 const savedPath = localStorage.getItem(CLIENT_PATH_KEY);
+diagnosticsToggle.checked = localStorage.getItem(DIAGNOSTICS_KEY) !== "false";
+diagnosticsToggle.addEventListener("change", () => {
+  localStorage.setItem(DIAGNOSTICS_KEY, String(diagnosticsToggle.checked));
+});
 if (savedPath) pathInput.value = savedPath;
 
 async function boot() {

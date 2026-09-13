@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+pub mod diagnostics;
 pub mod news;
 pub mod updater;
 
