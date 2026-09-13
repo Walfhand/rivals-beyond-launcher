@@ -237,6 +237,10 @@ fn event(record: &Record) -> Value {
                 | "map"
                 | "renderer"
                 | "multisample"
+                | "resolution"
+                | "monitor"
+                | "resolution_configured"
+                | "resolution_source"
         ) {
             event["tags"][key] = json!(scrub(value));
         }
@@ -417,6 +421,7 @@ pub fn watch_game(
     manifest: &crate::updater::Manifest,
     enabled: bool,
     session: &str,
+    resolution: &crate::updater::ResolutionChoice,
 ) -> std::io::Result<std::process::ExitStatus> {
     let started = std::time::Instant::now();
     let hash = |path: &str| {
@@ -427,8 +432,12 @@ pub fn watch_game(
             .map(|file| file.sha256.as_str())
             .unwrap_or("unknown")
     };
+    let dimensions = |size: Option<(u32, u32)>| {
+        size.map(|(w, h)| format!("{w}x{h}"))
+            .unwrap_or_else(|| "unknown".into())
+    };
     let context = format!(
-        "os={} backend={} patch={} outline={} modern_m2={} manifest_sequence={}",
+        "os={} backend={} patch={} outline={} modern_m2={} manifest_sequence={} monitor={} resolution_configured={} resolution_source={}",
         std::env::consts::OS,
         if root.join("d3d9.dll").is_file() {
             "dxvk"
@@ -438,7 +447,10 @@ pub fn watch_game(
         hash("Data/PATCH-Z.MPQ"),
         hash("Extensions/UnitOutline/UnitOutline.dll"),
         hash("Extensions/wxl-modern-m2/wxl-modern-m2.dll"),
-        manifest.sequence
+        manifest.sequence,
+        dimensions(resolution.monitor),
+        dimensions(resolution.configured),
+        resolution.source
     );
     let mut record = Record {
         schema: 1,

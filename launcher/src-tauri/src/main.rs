@@ -261,7 +261,7 @@ async fn launch_game(
             let size = monitor.size();
             (size.width, size.height)
         });
-        updater::configure_client_defaults(&root, screen)?;
+        let resolution = updater::configure_client_defaults(&root, screen)?;
         let session = diagnostics::new_session();
         let mut child = Command::new(wow)
             .current_dir(&root)
@@ -280,6 +280,7 @@ async fn launch_game(
             &loaded.manifest,
             diagnostics_enabled,
             &session,
+            &resolution,
         )
         .map(|_| ())
         .map_err(|error| format!("Suivi de Wow.exe impossible : {error}"));

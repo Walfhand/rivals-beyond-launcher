@@ -241,11 +241,32 @@ fn every_started_process_records_its_version_duration_and_abnormal_exit_without_
             .args(["-c", &format!("exit {code}")])
             .spawn()
             .unwrap();
-        let status = watch_game(&mut child, &root, &manifest, false, &new_session()).unwrap();
+        let resolution =
+            crate::updater::configure_client_defaults(&root, Some((2560, 1440))).unwrap();
+        let status = watch_game(
+            &mut child,
+            &root,
+            &manifest,
+            false,
+            &new_session(),
+            &resolution,
+        )
+        .unwrap();
         assert_eq!(status.code(), Some(code));
     }
     let records = read_records(&root);
     assert_eq!(records.len(), 4);
+    assert!(records[0]
+        .context
+        .contains("monitor=2560x1440 resolution_configured=2560x1440 resolution_source=monitor"));
+    assert!(records[2].context.contains("resolution_source=saved"));
+    let launch = event(&records[0]);
+    assert_eq!(launch["tags"]["monitor"], "2560x1440");
+    assert_eq!(launch["tags"]["resolution_configured"], "2560x1440");
+    assert_eq!(launch["tags"]["resolution_source"], "monitor");
+    let mut in_game = record();
+    in_game.context = "resolution=1920x1080".into();
+    assert_eq!(event(&in_game)["tags"]["resolution"], "1920x1080");
     assert_eq!(
         records.iter().filter(|r| r.kind == "game_started").count(),
         2

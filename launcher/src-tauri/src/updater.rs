@@ -1223,7 +1223,17 @@ fn download_part_path(path: &Path, sha256: &str) -> PathBuf {
     sidecar_path(path, &format!(".moba.part.{sha256}"))
 }
 
-pub fn configure_client_defaults(root: &Path, screen: Option<(u32, u32)>) -> Result<(), String> {
+#[derive(Debug)]
+pub struct ResolutionChoice {
+    pub monitor: Option<(u32, u32)>,
+    pub configured: Option<(u32, u32)>,
+    pub source: &'static str,
+}
+
+pub fn configure_client_defaults(
+    root: &Path,
+    screen: Option<(u32, u32)>,
+) -> Result<ResolutionChoice, String> {
     validate_root(root)?;
     let path = target_path(root, "WTF/Config.wtf", true)?;
     let mut config = match fs::read(&path) {
@@ -1237,30 +1247,61 @@ pub fn configure_client_defaults(root: &Path, screen: Option<(u32, u32)>) -> Res
         }
     };
     let original_len = config.len();
+    let saved_resolution = config_setting(&config, "gxResolution").is_some();
+    let monitor = screen.filter(|(width, height)| *width > 0 && *height > 0);
     append_config_default(&mut config, "showTutorials", "0");
-    if let Some((width, height)) = screen.filter(|(width, height)| *width > 0 && *height > 0) {
+    if let Some((width, height)) = monitor {
         append_config_default(&mut config, "gxResolution", &format!("{width}x{height}"));
     }
-    if config.len() == original_len {
-        return Ok(());
+    if config.len() != original_len {
+        atomic_write(&path, &config)?;
     }
-    atomic_write(&path, &config)
+    let configured = config_setting(&config, "gxResolution").and_then(|value| {
+        let value = std::str::from_utf8(value).ok()?.trim_matches('"');
+        let (width, height) = value.split_once('x')?;
+        let size = (width.parse::<u32>().ok()?, height.parse::<u32>().ok()?);
+        (size.0 > 0 && size.1 > 0).then_some(size)
+    });
+    Ok(ResolutionChoice {
+        monitor,
+        configured,
+        source: if saved_resolution {
+            if configured.is_some() {
+                "saved"
+            } else {
+                "saved_invalid"
+            }
+        } else if monitor.is_some() {
+            "monitor"
+        } else {
+            "client_default"
+        },
+    })
 }
 
-fn append_config_default(config: &mut Vec<u8>, name: &str, value: &str) {
-    // Keep the client's original encoding and every explicitly saved preference.
-    let content = config.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&config);
-    if content.split(|byte| *byte == b'\n').any(|line| {
+fn config_setting<'a>(config: &'a [u8], name: &str) -> Option<&'a [u8]> {
+    let content = config.strip_prefix(b"\xef\xbb\xbf").unwrap_or(config);
+    content.split(|byte| *byte == b'\n').rev().find_map(|line| {
         let mut words = line
             .split(u8::is_ascii_whitespace)
             .filter(|word| !word.is_empty());
-        words
+        if words
             .next()
             .is_some_and(|word| word.eq_ignore_ascii_case(b"SET"))
             && words
                 .next()
                 .is_some_and(|word| word.eq_ignore_ascii_case(name.as_bytes()))
-    }) {
+        {
+            Some(words.next().unwrap_or(&[]))
+        } else {
+            None
+        }
+    })
+}
+
+fn append_config_default(config: &mut Vec<u8>, name: &str, value: &str) {
+    // Keep the client's original encoding and every explicitly saved preference.
+    if config_setting(config, name).is_some() {
         return;
     }
     if !config.is_empty() && !config.ends_with(b"\n") {
@@ -1476,6 +1517,38 @@ mod tests {
             configure_client_defaults(&root.0, Some((3840, 2160))).unwrap();
             assert_eq!(fs::read(&path).unwrap(), original);
         }
+    }
+
+    #[test]
+    fn resolution_diagnostics_describe_the_actual_defaulting_decision_without_recording_other_settings(
+    ) {
+        let root = TestDir::new();
+        let missing = configure_client_defaults(&root.0, None).unwrap();
+        assert_eq!(missing.source, "client_default");
+        assert_eq!(missing.configured, None);
+        let initial = configure_client_defaults(&root.0, Some((2560, 1440))).unwrap();
+        assert_eq!(initial.source, "monitor");
+        assert_eq!(initial.monitor, Some((2560, 1440)));
+        assert_eq!(initial.configured, Some((2560, 1440)));
+        let saved = configure_client_defaults(&root.0, Some((3840, 2160))).unwrap();
+        assert_eq!(saved.source, "saved");
+        assert_eq!(saved.configured, Some((2560, 1440)));
+        fs::write(root.0.join("WTF/Config.wtf"), b"\xef\xbb\xbfSET accountName \"private\"\nset GXRESOLUTION \"1920x1080\"\nSET gxResolution \"1280x720\"\n").unwrap();
+        let last = configure_client_defaults(&root.0, Some((3840, 2160))).unwrap();
+        assert_eq!(
+            last.configured,
+            Some((1280, 720)),
+            "The last saved assignment wins in the client"
+        );
+        assert!(!format!("{last:?}").contains("private"));
+        fs::write(
+            root.0.join("WTF/Config.wtf"),
+            b"SET gxResolution \"private\"\n",
+        )
+        .unwrap();
+        let invalid = configure_client_defaults(&root.0, Some((3840, 2160))).unwrap();
+        assert_eq!(invalid.source, "saved_invalid");
+        assert_eq!(invalid.configured, None);
     }
 
     fn valid_manifest() -> Manifest {

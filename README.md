@@ -56,6 +56,12 @@ for window layering. Use `client_version` and the ephemeral `session` tag to cor
 are Sentry events/issues rather than an unbounded stream of raw logs; quotas and local rotation mean
 counts can be incomplete. No unique-player count is collected.
 
+Resolution diagnostics include the detected monitor size, the preserved/written resolution and the
+selection reason (`saved`, `monitor`, `client_default` or `saved_invalid` when the stored value cannot
+be parsed). Compare `resolution_configured` on the launch event with the game's `resolution` tag on
+the first world-entry checkpoint, using the same `session` tag. Other settings/account values are
+not included in this report.
+
 Tests: `cargo test --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --lib`.
 An explicit smoke test sends one synthetic development event to the configured project:
 `cargo run --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --example diagnostics_smoke -- --send`.
