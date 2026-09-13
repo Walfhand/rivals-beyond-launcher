@@ -241,6 +241,7 @@ fn event(record: &Record) -> Value {
                 | "monitor"
                 | "resolution_configured"
                 | "resolution_source"
+                | "hw_detect_disabled"
         ) {
             event["tags"][key] = json!(scrub(value));
         }
@@ -437,7 +438,7 @@ pub fn watch_game(
             .unwrap_or_else(|| "unknown".into())
     };
     let context = format!(
-        "os={} backend={} patch={} outline={} modern_m2={} manifest_sequence={} monitor={} resolution_configured={} resolution_source={}",
+        "os={} backend={} patch={} outline={} modern_m2={} manifest_sequence={} monitor={} resolution_configured={} resolution_source={} hw_detect_disabled={}",
         std::env::consts::OS,
         if root.join("d3d9.dll").is_file() {
             "dxvk"
@@ -450,7 +451,8 @@ pub fn watch_game(
         manifest.sequence,
         dimensions(resolution.monitor),
         dimensions(resolution.configured),
-        resolution.source
+        resolution.source,
+        resolution.hardware_detection_disabled
     );
     let mut record = Record {
         schema: 1,

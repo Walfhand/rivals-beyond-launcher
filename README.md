@@ -14,9 +14,13 @@ MOBA. It installs, repairs, updates and starts the game client from cryptographi
   a separate dependency download during setup.
 - Uses DXVK only when the system meets its Vulkan requirements, otherwise falling back to system D3D9.
 - Defaults the in-game tutorial to off before launch when `WTF/Config.wtf` has no `showTutorials`
-  setting, preserving existing preferences and all other client settings.
+  setting, preserving existing gameplay and video preferences.
 - Initializes a missing `gxResolution` from the primary monitor's physical pixel dimensions.
   Saved resolutions stay unchanged; if monitor detection fails, the game chooses its own default.
+- Disables the native startup hardware preset pass (`hwDetect=0`) when a usable resolution is
+  configured, so it does not replace the prepared mode on a fresh first launch.
+- Skips the original and expansion intro movies and the legacy WoW notice screens through local
+  startup CVars. This does not submit or store account-side acceptance of any service's terms.
 - Links directly to the official account registration and Rivals Beyond news.
 
 This repository contains the launcher source, interface, packaging and CI configuration. It does not
@@ -61,6 +65,13 @@ selection reason (`saved`, `monitor`, `client_default` or `saved_invalid` when t
 be parsed). Compare `resolution_configured` on the launch event with the game's `resolution` tag on
 the first world-entry checkpoint, using the same `session` tag. Other settings/account values are
 not included in this report.
+
+`hw_detect_disabled` records whether startup preparation disabled the native hardware preset pass.
+To reproduce a fresh launch, close WoW, back up/remove `WTF/Config.wtf`, then start the game through
+the updated launcher. The selected resolution and the startup flags are written together before
+`Wow.exe` is spawned. Existing video settings are retained; the local legacy boot flags are enforced
+even if an old config still requests the movies/notices. Files retain their original encoding and
+unrelated contents, and repeating preparation does not append duplicate overrides.
 
 Tests: `cargo test --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --lib`.
 An explicit smoke test sends one synthetic development event to the configured project:

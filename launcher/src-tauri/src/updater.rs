@@ -1228,6 +1228,7 @@ pub struct ResolutionChoice {
     pub monitor: Option<(u32, u32)>,
     pub configured: Option<(u32, u32)>,
     pub source: &'static str,
+    pub hardware_detection_disabled: bool,
 }
 
 pub fn configure_client_defaults(
@@ -1253,18 +1254,37 @@ pub fn configure_client_defaults(
     if let Some((width, height)) = monitor {
         append_config_default(&mut config, "gxResolution", &format!("{width}x{height}"));
     }
-    if config.len() != original_len {
-        atomic_write(&path, &config)?;
-    }
     let configured = config_setting(&config, "gxResolution").and_then(|value| {
         let value = std::str::from_utf8(value).ok()?.trim_matches('"');
         let (width, height) = value.split_once('x')?;
         let size = (width.parse::<u32>().ok()?, height.parse::<u32>().ok()?);
         (size.0 > 0 && size.1 > 0).then_some(size)
     });
+    // The native 3.3.5 startup hardware preset pass can replace the selected display mode.
+    // Keep it available only when neither the player nor the launcher supplied a usable resolution.
+    if configured.is_some() {
+        set_config_value(&mut config, "hwDetect", "0");
+    }
+    // These are local legacy WoW startup-screen flags, not account-side consent records.
+    for (name, value) in [
+        ("movie", "0"),
+        ("expansionMovie", "0"),
+        ("readTOS", "1"),
+        ("readEULA", "1"),
+        ("readTerminationWithoutNotice", "1"),
+        ("readScanning", "1"),
+        ("readContest", "1"),
+    ] {
+        set_config_value(&mut config, name, value);
+    }
+    if config.len() != original_len {
+        atomic_write(&path, &config)?;
+    }
     Ok(ResolutionChoice {
         monitor,
         configured,
+        hardware_detection_disabled: config_setting(&config, "hwDetect")
+            == Some(b"\"0\"".as_slice()),
         source: if saved_resolution {
             if configured.is_some() {
                 "saved"
@@ -1304,6 +1324,17 @@ fn append_config_default(config: &mut Vec<u8>, name: &str, value: &str) {
     if config_setting(config, name).is_some() {
         return;
     }
+    append_config_value(config, name, value);
+}
+
+fn set_config_value(config: &mut Vec<u8>, name: &str, value: &str) {
+    let quoted = format!("\"{value}\"");
+    if config_setting(config, name) != Some(quoted.as_bytes()) {
+        append_config_value(config, name, value);
+    }
+}
+
+fn append_config_value(config: &mut Vec<u8>, name: &str, value: &str) {
     if !config.is_empty() && !config.ends_with(b"\n") {
         config.extend_from_slice(b"\r\n");
     }
@@ -1474,7 +1505,10 @@ mod tests {
         let root = TestDir::new();
         let path = root.0.join("WTF/Config.wtf");
         configure_client_defaults(&root.0, None).unwrap();
-        assert_eq!(fs::read(&path).unwrap(), b"SET showTutorials \"0\"\r\n");
+        assert_eq!(
+            config_setting(&fs::read(&path).unwrap(), "showTutorials"),
+            Some(b"\"0\"".as_slice())
+        );
 
         for original in [
             b"SET gxResolution \"2560x1440\"".as_slice(),
@@ -1486,11 +1520,10 @@ mod tests {
             configure_client_defaults(&root.0, None).unwrap();
             let configured = fs::read(&path).unwrap();
             assert!(configured.starts_with(original));
-            if original.starts_with(b"SET showTutorials") || original.starts_with(b"  set") {
-                assert_eq!(configured, original);
-            } else {
-                assert!(configured.ends_with(b"\nSET showTutorials \"0\"\r\n"));
-            }
+            assert_eq!(
+                config_setting(&configured, "showTutorials"),
+                config_setting(original, "showTutorials").or(Some(b"\"0\"".as_slice()))
+            );
             configure_client_defaults(&root.0, None).unwrap();
             assert_eq!(fs::read(&path).unwrap(), configured);
         }
@@ -1502,20 +1535,29 @@ mod tests {
         let path = root.0.join("WTF/Config.wtf");
         for screen in [None, Some((0, 1440)), Some((2560, 0))] {
             configure_client_defaults(&root.0, screen).unwrap();
-            assert_eq!(fs::read(&path).unwrap(), b"SET showTutorials \"0\"\r\n");
+            let config = fs::read(&path).unwrap();
+            assert_eq!(config_setting(&config, "gxResolution"), None);
+            assert_eq!(config_setting(&config, "hwDetect"), None);
         }
         configure_client_defaults(&root.0, Some((2560, 1440))).unwrap();
-        assert_eq!(
-            fs::read(&path).unwrap(),
-            b"SET showTutorials \"0\"\r\nSET gxResolution \"2560x1440\"\r\n"
-        );
+        let config = fs::read(&path).unwrap();
+        assert!(String::from_utf8_lossy(&config).contains("SET gxResolution \"2560x1440\"\r\n"));
         for original in [
             b"SET gxResolution \"1920x1080\"\nSET showTutorials \"1\"\n".as_slice(),
             b"\xef\xbb\xbfset GXRESOLUTION \"1920x1080\"\nSET showTutorials \"1\"\n",
         ] {
             fs::write(&path, original).unwrap();
             configure_client_defaults(&root.0, Some((3840, 2160))).unwrap();
-            assert_eq!(fs::read(&path).unwrap(), original);
+            let config = fs::read(&path).unwrap();
+            assert!(config.starts_with(original));
+            assert_eq!(
+                config_setting(&config, "gxResolution"),
+                Some(b"\"1920x1080\"".as_slice())
+            );
+            assert_eq!(
+                config_setting(&config, "showTutorials"),
+                Some(b"\"1\"".as_slice())
+            );
         }
     }
 
@@ -1549,6 +1591,67 @@ mod tests {
         let invalid = configure_client_defaults(&root.0, Some((3840, 2160))).unwrap();
         assert_eq!(invalid.source, "saved_invalid");
         assert_eq!(invalid.configured, None);
+    }
+
+    #[test]
+    fn fresh_launch_keeps_the_selected_resolution_and_skips_legacy_boot_screens() {
+        let root = TestDir::new();
+        let choice = configure_client_defaults(&root.0, Some((2560, 1600))).unwrap();
+        let path = root.0.join("WTF/Config.wtf");
+        let config = fs::read(&path).unwrap();
+        assert_eq!(choice.configured, Some((2560, 1600)));
+        assert!(choice.hardware_detection_disabled);
+        for line in [
+            "SET gxResolution \"2560x1600\"",
+            "SET hwDetect \"0\"",
+            "SET movie \"0\"",
+            "SET expansionMovie \"0\"",
+            "SET readTOS \"1\"",
+            "SET readEULA \"1\"",
+            "SET readTerminationWithoutNotice \"1\"",
+            "SET readScanning \"1\"",
+            "SET readContest \"1\"",
+        ] {
+            assert!(
+                String::from_utf8_lossy(&config).contains(line),
+                "Missing initial startup setting: {line}"
+            );
+        }
+        configure_client_defaults(&root.0, Some((2560, 1600))).unwrap();
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            config,
+            "Repeated preparation must not accumulate settings"
+        );
+    }
+
+    #[test]
+    fn existing_boot_prompts_are_disabled_without_replacing_video_or_account_preferences() {
+        let root = TestDir::new();
+        fs::create_dir(root.0.join("WTF")).unwrap();
+        let path = root.0.join("WTF/Config.wtf");
+        let previous = b"SET gxResolution \"1920x1080\"\nSET accountName \"\xff\"\nSET movie \"1\"\nSET expansionMovie \"1\"\nSET readTOS \"0\"\nSET hwDetect \"1\"\n";
+        fs::write(&path, previous).unwrap();
+        let choice = configure_client_defaults(&root.0, Some((2560, 1600))).unwrap();
+        let config = fs::read(&path).unwrap();
+        assert!(
+            config.starts_with(previous),
+            "Preserve original encoding and unrelated preferences"
+        );
+        assert_eq!(choice.configured, Some((1920, 1080)));
+        assert_eq!(
+            config_setting(&config, "hwDetect"),
+            Some(b"\"0\"".as_slice())
+        );
+        assert_eq!(config_setting(&config, "movie"), Some(b"\"0\"".as_slice()));
+        assert_eq!(
+            config_setting(&config, "expansionMovie"),
+            Some(b"\"0\"".as_slice())
+        );
+        assert_eq!(
+            config_setting(&config, "readTOS"),
+            Some(b"\"1\"".as_slice())
+        );
     }
 
     fn valid_manifest() -> Manifest {

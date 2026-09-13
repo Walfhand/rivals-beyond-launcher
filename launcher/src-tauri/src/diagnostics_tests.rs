@@ -264,6 +264,7 @@ fn every_started_process_records_its_version_duration_and_abnormal_exit_without_
     assert_eq!(launch["tags"]["monitor"], "2560x1440");
     assert_eq!(launch["tags"]["resolution_configured"], "2560x1440");
     assert_eq!(launch["tags"]["resolution_source"], "monitor");
+    assert_eq!(launch["tags"]["hw_detect_disabled"], "true");
     let mut in_game = record();
     in_game.context = "resolution=1920x1080".into();
     assert_eq!(event(&in_game)["tags"]["resolution"], "1920x1080");
