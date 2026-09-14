@@ -43,7 +43,6 @@ const REQUIRED_FILES: &[&str] = &[
     "data/patch-e.mpq",
     "data/patch-p.mpq",
     "data/patch-z.mpq",
-    "data/frfr/locale-frfr.mpq",
 ];
 const RETIRED_MANAGED_FILES: &[&str] = &[
     "AwesomeWotlkLib.dll",
@@ -58,6 +57,8 @@ pub struct FileEntry {
     pub path: String,
     pub size: u64,
     pub sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locale: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -70,6 +71,8 @@ pub struct Manifest {
     pub file_count: usize,
     pub total_size: u64,
     pub files: Vec<FileEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub locales: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -89,6 +92,10 @@ pub struct LoadedManifest {
 #[derive(Clone, Serialize)]
 pub struct Progress {
     pub message: String,
+    pub phase: &'static str,
+    pub path: String,
+    pub attempt: u32,
+    pub delay_seconds: f32,
     pub items_done: u64,
     pub items_total: u64,
     pub bytes_done: u64,
@@ -108,6 +115,8 @@ enum DownloadEvent {
 pub struct UpdateSummary {
     pub version: String,
     pub changed_files: usize,
+    pub available_locales: Vec<String>,
+    pub installed_locales: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -125,6 +134,9 @@ pub struct ClientStatus {
     pub can_launch: bool,
     pub local_version: Option<String>,
     pub remote_version: Option<String>,
+    pub configured_locale: Option<String>,
+    pub available_locales: Vec<String>,
+    pub installed_locales: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -134,11 +146,13 @@ struct LocalState {
     sequence: u64,
     client_version: String,
     manifest_sha256: String,
+    #[serde(default)]
+    installed_locales: Vec<String>,
 }
 
 impl Manifest {
     fn validate(&self) -> Result<(), String> {
-        if self.schema_version != 1 {
+        if ![1, 2].contains(&self.schema_version) {
             return Err("Version de manifeste non prise en charge.".into());
         }
         if self.sequence == 0 {
@@ -158,10 +172,40 @@ impl Manifest {
         }
         validate_https_url(&self.object_base_url, true)?;
 
+        if self.schema_version == 1 {
+            if !self.locales.is_empty() || self.files.iter().any(|file| file.locale.is_some()) {
+                return Err("Legacy manifests cannot declare optional language packs.".into());
+            }
+        } else if self.locales.is_empty()
+            || self
+                .locales
+                .iter()
+                .any(|locale| !SUPPORTED_LOCALES.contains(&locale.as_str()))
+            || self.locales.iter().collect::<HashSet<_>>().len() != self.locales.len()
+        {
+            return Err("Invalid available language packs.".into());
+        }
         let mut paths = HashSet::with_capacity(self.files.len());
         let mut total = 0u64;
         for entry in &self.files {
             validate_windows_path(&entry.path)?;
+            if self.schema_version == 2 {
+                let parts: Vec<_> = entry.path.split('/').collect();
+                let locale_path = parts.len() >= 3
+                    && parts[0].eq_ignore_ascii_case("Data")
+                    && parts[1].len() == 4
+                    && parts[1].bytes().all(|b| b.is_ascii_alphabetic());
+                let expected = entry.locale.as_deref();
+                if locale_path != expected.is_some()
+                    || expected.is_some_and(|locale| {
+                        !self.locales.iter().any(|available| available == locale)
+                            || !parts[0].eq_ignore_ascii_case("Data")
+                            || !parts[1].eq_ignore_ascii_case(locale)
+                    })
+                {
+                    return Err(format!("Invalid language assignment: {}", entry.path));
+                }
+            }
             if !paths.insert(entry.path.to_ascii_lowercase()) {
                 return Err(format!(
                     "Chemin dupliqué sans tenir compte de la casse : {}",
@@ -188,8 +232,264 @@ impl Manifest {
                 return Err(format!("Fichier client obligatoire absent : {required}"));
             }
         }
+        if self.schema_version == 1 {
+            if !paths.contains("data/frfr/locale-frfr.mpq") {
+                return Err("Legacy French client language is missing.".into());
+            }
+        } else {
+            for locale in &self.locales {
+                for path in locale_required_files(locale) {
+                    if !paths.contains(&path.to_ascii_lowercase()) {
+                        return Err(format!("Required language file missing: {path}"));
+                    }
+                }
+            }
+        }
         Ok(())
     }
+}
+
+const SUPPORTED_LOCALES: &[&str] = &["frFR", "enUS"];
+
+fn locale_required_files(locale: &str) -> Vec<String> {
+    let mut paths: Vec<_> = [
+        "locale",
+        "speech",
+        "expansion-locale",
+        "expansion-speech",
+        "lichking-locale",
+        "lichking-speech",
+        "base",
+        "patch",
+    ]
+    .iter()
+    .map(|prefix| format!("Data/{locale}/{prefix}-{locale}.MPQ"))
+    .collect();
+    paths.extend([
+        format!("Data/{locale}/patch-{locale}-2.MPQ"),
+        format!("Data/{locale}/patch-{locale}-3.MPQ"),
+        format!("Data/{locale}/WTF/DefaultBindings.wtf"),
+    ]);
+    paths
+}
+
+fn available_locales(manifest: &Manifest) -> Vec<String> {
+    if manifest.schema_version == 2 {
+        return manifest.locales.clone();
+    }
+    SUPPORTED_LOCALES
+        .iter()
+        .filter(|locale| {
+            locale_required_files(locale)
+                .into_iter()
+                .filter(|path| path.ends_with(".MPQ"))
+                .all(|path| {
+                    manifest
+                        .files
+                        .iter()
+                        .any(|entry| entry.path.eq_ignore_ascii_case(&path))
+                })
+        })
+        .map(|locale| (*locale).into())
+        .collect()
+}
+
+fn file_present(root: &Path, entry: &FileEntry) -> Result<bool, String> {
+    let mut target = target_path(root, &entry.path, false)?;
+    if entry.path.eq_ignore_ascii_case(DXVK_FILE) && regular_file_size(&target)?.is_none() {
+        target = target_path(root, DXVK_PARKED_FILE, false)?;
+    }
+    Ok(regular_file_size(&target)? == Some(entry.size))
+}
+
+fn installed_locales(root: &Path, manifest: &Manifest) -> Result<Vec<String>, String> {
+    let mut installed = Vec::new();
+    for locale in available_locales(manifest) {
+        let prefix = format!("data/{}/", locale.to_ascii_lowercase());
+        let entries: Vec<_> = manifest
+            .files
+            .iter()
+            .filter(|entry| entry.path.to_ascii_lowercase().starts_with(&prefix))
+            .collect();
+        let mut ready = !entries.is_empty();
+        for entry in entries {
+            ready &= file_present(root, entry)?;
+        }
+        if ready {
+            installed.push(locale);
+        }
+    }
+    Ok(installed)
+}
+
+fn select_language_files(
+    root: &Path,
+    manifest: &Manifest,
+    locale: &str,
+    additional: Option<&str>,
+) -> Result<Manifest, String> {
+    let available = available_locales(manifest);
+    for requested in std::iter::once(locale).chain(additional) {
+        if !available.iter().any(|value| value == requested) {
+            return Err(format!("Language pack unavailable: {requested}"));
+        }
+    }
+    // Schema 1 is an indivisible signed payload; keep its original behavior.
+    if manifest.schema_version == 1 {
+        return Ok(manifest.clone());
+    }
+    let mut wanted = installed_locales(root, manifest)?;
+    if let Some(state) = read_state(root) {
+        wanted.extend(
+            state
+                .installed_locales
+                .into_iter()
+                .filter(|value| available.contains(value)),
+        );
+    }
+    // Keep an explicit additional-pack request across interruption, even before its base archive exists.
+    let pending = incomplete_state_path(root);
+    if regular_file_size(&pending)?.is_some_and(|size| size <= 64 * 1024) {
+        let bytes = fs::read(pending)
+            .map_err(|error| format!("Cannot read pending language packs: {error}"))?;
+        if let Ok(locales) = serde_json::from_slice::<Vec<String>>(&bytes) {
+            wanted.extend(
+                locales
+                    .into_iter()
+                    .filter(|value| available.contains(value)),
+            );
+        }
+    }
+    // A partially damaged existing pack is still repaired, never silently abandoned.
+    for candidate in &available {
+        let native = target_path(
+            root,
+            &format!("Data/{candidate}/locale-{candidate}.MPQ"),
+            false,
+        )?;
+        if regular_file_size(&native)?.is_some() {
+            wanted.push(candidate.clone());
+        }
+    }
+    wanted.push(locale.into());
+    wanted.extend(additional.map(str::to_string));
+    let mut selected = manifest.clone();
+    selected.files.retain(|entry| {
+        entry
+            .locale
+            .as_ref()
+            .is_none_or(|value| wanted.contains(value))
+    });
+    selected
+        .files
+        .sort_by_key(|entry| match entry.locale.as_deref() {
+            Some(value) if value == locale => 0,
+            None => 1,
+            _ => 2,
+        });
+    selected.file_count = selected.files.len();
+    selected.total_size = selected.files.iter().map(|entry| entry.size).sum();
+    selected.locales.retain(|value| wanted.contains(value));
+    Ok(selected)
+}
+
+pub fn client_status_for_locale(
+    root: &Path,
+    loaded: &LoadedManifest,
+    locale: &str,
+) -> Result<ClientStatus, String> {
+    let mut status = client_status_against_manifest(root, loaded)?;
+    status.available_locales = available_locales(&loaded.manifest);
+    status.installed_locales = installed_locales(root, &loaded.manifest)?;
+    if !status
+        .available_locales
+        .iter()
+        .any(|available| available == locale)
+    {
+        status.can_launch = false;
+        if status.state == ClientState::Ready {
+            status.state = ClientState::UpdateAvailable;
+        }
+        return Ok(status);
+    }
+    let selected = select_language_files(root, &loaded.manifest, locale, None)?;
+    for entry in &selected.files {
+        if !file_present(root, entry)? {
+            status.can_launch = false;
+            if status.state == ClientState::Ready {
+                status.state = ClientState::UpdateAvailable;
+            }
+        }
+    }
+    Ok(status)
+}
+
+pub fn update_client_for_locale<F>(
+    client: &Client,
+    root: &Path,
+    mut loaded: LoadedManifest,
+    realm_address: &str,
+    repair: bool,
+    locale: &str,
+    additional: Option<&str>,
+    progress: F,
+) -> Result<UpdateSummary, String>
+where
+    F: FnMut(Progress),
+{
+    let available = available_locales(&loaded.manifest);
+    let previously_verified = read_state(root)
+        .map(|state| state.installed_locales)
+        .unwrap_or_default();
+    loaded.manifest = select_language_files(root, &loaded.manifest, locale, additional)?;
+    let verify_pack = loaded
+        .manifest
+        .locales
+        .iter()
+        .any(|value| !previously_verified.contains(value));
+    let mut summary = update_client(
+        client,
+        root,
+        loaded,
+        realm_address,
+        repair || verify_pack,
+        progress,
+    )?;
+    summary.available_locales = available;
+    Ok(summary)
+}
+
+fn configured_client_locale(root: &Path) -> Result<Option<String>, String> {
+    let path = target_path(root, "WTF/Config.wtf", false)?;
+    let config = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("Cannot read game preferences: {error}")),
+    };
+    Ok(config_setting(&config, "locale")
+        .and_then(|value| std::str::from_utf8(value).ok())
+        .map(|value| value.trim_matches('"'))
+        .filter(|value| SUPPORTED_LOCALES.contains(value))
+        .map(str::to_string))
+}
+
+pub fn configure_client_locale(root: &Path, locale: &str) -> Result<(), String> {
+    if !SUPPORTED_LOCALES.contains(&locale) {
+        return Err("Language pack unavailable.".into());
+    }
+    validate_root(root)?;
+    let path = target_path(root, "WTF/Config.wtf", true)?;
+    let mut config = match fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(format!("Cannot read game preferences: {error}")),
+    };
+    let before = config.len();
+    set_config_value(&mut config, "locale", locale);
+    if before != config.len() {
+        atomic_write(&path, &config)?;
+    }
+    Ok(())
 }
 
 pub fn public_key() -> Result<[u8; 32], String> {
@@ -322,6 +622,9 @@ pub fn client_status(root: &Path) -> Result<ClientStatus, String> {
         can_launch,
         local_version,
         remote_version: None,
+        configured_locale: configured_client_locale(root)?,
+        available_locales: Vec::new(),
+        installed_locales: Vec::new(),
     })
 }
 
@@ -644,15 +947,15 @@ where
             .ok_or_else(|| "La taille des téléchargements déborde.".to_string())
     })?;
     if !changed.is_empty() || !retired_files.is_empty() {
-        write_incomplete_state(root, &loaded.sha256)?;
+        write_incomplete_state(root, &loaded.manifest.locales)?;
     }
     let mut completed_bytes = 0u64;
     for (index, entry) in changed.iter().enumerate() {
         let base = completed_bytes;
         download_and_replace(client, root, &loaded.manifest, entry, |event| {
-            let (message, current) = match event {
+            let (message, current, phase, attempt_number, delay_seconds) = match event {
                 DownloadEvent::Bytes(current) => {
-                    (format!("Téléchargement de {}", entry.path), current)
+                    (format!("Téléchargement de {}", entry.path), current, "download", 0, 0.0)
                 }
                 DownloadEvent::Retrying {
                     bytes,
@@ -663,11 +966,15 @@ where
                         "Connexion interrompue — nouvelle tentative {attempt}/{HTTP_ATTEMPTS} dans {} s",
                         delay.as_secs_f32()
                     ),
-                    bytes,
+                    bytes, "retry", attempt, delay.as_secs_f32(),
                 ),
             };
             progress(Progress {
                 message,
+                phase,
+                path: entry.path.clone(),
+                attempt: attempt_number,
+                delay_seconds,
                 items_done: index as u64,
                 items_total: changed.len() as u64,
                 bytes_done: base.saturating_add(current),
@@ -677,6 +984,10 @@ where
         completed_bytes = completed_bytes.saturating_add(entry.size);
         progress(Progress {
             message: format!("Installation de {}", entry.path),
+            phase: "install",
+            path: entry.path.clone(),
+            attempt: 0,
+            delay_seconds: 0.0,
             items_done: (index + 1) as u64,
             items_total: changed.len() as u64,
             bytes_done: completed_bytes,
@@ -689,6 +1000,7 @@ where
     write_state(
         root,
         &LocalState {
+            installed_locales: installed_locales(root, &loaded.manifest)?,
             schema_version: 1,
             sequence: loaded.manifest.sequence,
             client_version: loaded.manifest.client_version.clone(),
@@ -697,8 +1009,10 @@ where
     )?;
     clear_incomplete_state(root)?;
     Ok(UpdateSummary {
-        version: loaded.manifest.client_version,
+        version: loaded.manifest.client_version.clone(),
         changed_files: changed.len() + retired_files.len(),
+        available_locales: available_locales(&loaded.manifest),
+        installed_locales: installed_locales(root, &loaded.manifest)?,
     })
 }
 
@@ -774,6 +1088,10 @@ where
                 hash_file(&target, |read| {
                     progress(Progress {
                         message: format!("Vérification de {}", entry.path),
+                        phase: "check",
+                        path: entry.path.clone(),
+                        attempt: 0,
+                        delay_seconds: 0.0,
                         items_done: index as u64,
                         items_total: manifest.file_count as u64,
                         bytes_done: base.saturating_add(read),
@@ -790,6 +1108,10 @@ where
         completed_bytes = completed_bytes.saturating_add(entry.size);
         progress(Progress {
             message: format!("Vérification de {}", entry.path),
+            phase: "check",
+            path: entry.path.clone(),
+            attempt: 0,
+            delay_seconds: 0.0,
             items_done: (index + 1) as u64,
             items_total: manifest.file_count as u64,
             bytes_done: completed_bytes,
@@ -1343,7 +1665,7 @@ fn append_config_value(config: &mut Vec<u8>, name: &str, value: &str) {
 
 fn write_realmlist(root: &Path, realm_address: &str) -> Result<(), String> {
     for locale in ["frFR", "enUS"] {
-        if locale != "frFR" && !root.join("Data").join(locale).is_dir() {
+        if !root.join("Data").join(locale).is_dir() {
             continue;
         }
         let path = target_path(root, &format!("Data/{locale}/realmlist.wtf"), true)?;
@@ -1388,9 +1710,10 @@ fn ensure_state_directory(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn write_incomplete_state(root: &Path, manifest_sha256: &str) -> Result<(), String> {
+fn write_incomplete_state(root: &Path, locales: &[String]) -> Result<(), String> {
     ensure_state_directory(root)?;
-    atomic_write(&incomplete_state_path(root), manifest_sha256.as_bytes())
+    let pending = serde_json::to_vec(locales).map_err(|error| error.to_string())?;
+    atomic_write(&incomplete_state_path(root), &pending)
 }
 
 fn clear_incomplete_state(root: &Path) -> Result<(), String> {
@@ -1510,7 +1833,12 @@ mod tests {
     fn every_installed_language_connects_to_the_managed_realm() {
         let root = TestDir::new();
         fs::create_dir_all(root.0.join("Data/enUS")).unwrap();
-        fs::write(root.0.join("Data/enUS/realmlist.wtf"), b"set realmlist other.example").unwrap();
+        fs::create_dir_all(root.0.join("Data/frFR")).unwrap();
+        fs::write(
+            root.0.join("Data/enUS/realmlist.wtf"),
+            b"set realmlist other.example",
+        )
+        .unwrap();
         write_realmlist(&root.0, "realm.example").unwrap();
         for locale in ["frFR", "enUS"] {
             assert_eq!(
@@ -1693,12 +2021,14 @@ mod tests {
         let files: Vec<_> = paths
             .into_iter()
             .map(|path| FileEntry {
+                locale: None,
                 path: path.into(),
                 size: 1,
                 sha256: "00".repeat(32),
             })
             .collect();
         Manifest {
+            locales: Vec::new(),
             schema_version: 1,
             sequence: 1,
             client_version: "test".into(),
@@ -1837,7 +2167,7 @@ mod tests {
         let outdated = client_status_against_manifest(root, &loaded).unwrap();
         assert_eq!(outdated.state, ClientState::UpdateAvailable);
 
-        write_incomplete_state(root, &loaded.sha256).unwrap();
+        write_incomplete_state(root, &loaded.manifest.locales).unwrap();
         let incomplete = client_status_against_manifest(root, &loaded).unwrap();
         assert_eq!(incomplete.state, ClientState::Incomplete);
         clear_incomplete_state(root).unwrap();
@@ -1845,6 +2175,7 @@ mod tests {
         write_state(
             root,
             &LocalState {
+                installed_locales: Vec::new(),
                 schema_version: 1,
                 sequence: loaded.manifest.sequence,
                 client_version: loaded.manifest.client_version.clone(),
@@ -1887,6 +2218,7 @@ mod tests {
         let mut old_manifest = manifest;
         for path in RETIRED_MANAGED_FILES {
             old_manifest.files.push(FileEntry {
+                locale: None,
                 path: (*path).into(),
                 size: 1,
                 sha256: "00".repeat(32),
@@ -1906,6 +2238,7 @@ mod tests {
         let root = TestDir::new();
         let dxvk = b"pinned dxvk d3d9";
         let entry = FileEntry {
+            locale: None,
             path: DXVK_FILE.into(),
             size: dxvk.len() as u64,
             sha256: sha256_bytes(dxvk),
@@ -1939,6 +2272,7 @@ mod tests {
         let root = TestDir::new();
         let dxvk = b"pinned dxvk d3d9";
         let entry = FileEntry {
+            locale: None,
             path: DXVK_FILE.into(),
             size: dxvk.len() as u64,
             sha256: sha256_bytes(dxvk),
@@ -1983,6 +2317,7 @@ mod tests {
         fs::write(&target, b"old file").unwrap();
         let content = b"complete immutable object";
         let entry = FileEntry {
+            locale: None,
             path: "Data/patch.MPQ".into(),
             size: content.len() as u64,
             sha256: sha256_bytes(content),
@@ -2011,6 +2346,7 @@ mod tests {
         });
 
         let manifest = Manifest {
+            locales: Vec::new(),
             object_base_url: format!("http://{address}/"),
             files: vec![entry.clone()],
             file_count: 1,
@@ -2032,6 +2368,7 @@ mod tests {
         let content = b"an interrupted body that resumes";
         let split = 11;
         let entry = FileEntry {
+            locale: None,
             path: "Data/patch.MPQ".into(),
             size: content.len() as u64,
             sha256: sha256_bytes(content),
@@ -2070,6 +2407,7 @@ mod tests {
         });
 
         let manifest = Manifest {
+            locales: Vec::new(),
             object_base_url: format!("http://{address}/"),
             files: vec![entry.clone()],
             file_count: 1,
@@ -2090,6 +2428,7 @@ mod tests {
         fs::create_dir(target.parent().unwrap()).unwrap();
         let content = b"new immutable object";
         let entry = FileEntry {
+            locale: None,
             path: "Data/patch.MPQ".into(),
             size: content.len() as u64,
             sha256: sha256_bytes(content),
@@ -2116,6 +2455,7 @@ mod tests {
         });
 
         let manifest = Manifest {
+            locales: Vec::new(),
             object_base_url: format!("http://{address}/"),
             files: vec![entry.clone()],
             file_count: 1,
@@ -2137,11 +2477,13 @@ mod tests {
         let dll = b"new dll";
         let files = vec![
             FileEntry {
+                locale: None,
                 path: "Wow.exe".into(),
                 size: wow.len() as u64,
                 sha256: sha256_bytes(wow),
             },
             FileEntry {
+                locale: None,
                 path: "d3d9.dll".into(),
                 size: dll.len() as u64,
                 sha256: sha256_bytes(dll),
@@ -2210,6 +2552,7 @@ mod tests {
             socket.write_all(dll).unwrap();
         });
         let manifest = Manifest {
+            locales: Vec::new(),
             object_base_url: format!("http://{address}/"),
             ..manifest
         };
@@ -2254,6 +2597,7 @@ mod tests {
         fs::write(&target, b"known-good-old-file").unwrap();
         let expected = b"expected";
         let entry = FileEntry {
+            locale: None,
             path: "Data/patch.MPQ".into(),
             size: expected.len() as u64,
             sha256: sha256_bytes(expected),
@@ -2273,6 +2617,7 @@ mod tests {
         });
 
         let manifest = Manifest {
+            locales: Vec::new(),
             object_base_url: format!("http://{address}/"),
             files: vec![entry.clone()],
             file_count: 1,
@@ -2288,4 +2633,5 @@ mod tests {
         server.join().unwrap();
         assert_eq!(fs::read(target).unwrap(), b"known-good-old-file");
     }
+    include!("locale_tests.rs");
 }

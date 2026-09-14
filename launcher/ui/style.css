@@ -58,6 +58,7 @@ button {
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 summary:focus-visible,
 a:focus-visible {
   outline: 3px solid var(--focus);
@@ -736,7 +737,8 @@ progress::-webkit-progress-value {
   gap: 10px;
 }
 
-.path-row input {
+.path-row input,
+.path-row select {
   min-width: 0;
   width: 100%;
   height: 42px;
@@ -848,3 +850,8 @@ progress::-webkit-progress-value {
     padding-top: 10px;
   }
 }
+
+#installed-languages { margin-bottom: 4px; }
+#packs-help { margin-top: 4px; }
+
+#launcher-language { margin-bottom: 16px; }

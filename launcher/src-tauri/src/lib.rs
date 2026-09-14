@@ -39,6 +39,12 @@ impl From<String> for LauncherError {
                 "Le launcher ne peut pas écrire dans ce dossier.",
                 false,
             )
+        } else if lower.contains("language pack unavailable") {
+            (
+                "locale_unavailable",
+                "Cette langue du jeu n’est pas disponible.",
+                false,
+            )
         } else if lower.contains("mise à jour obligatoire") {
             (
                 "update_required",

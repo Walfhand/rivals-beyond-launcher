@@ -48,9 +48,36 @@ sets `MOBA_REALM_ADDRESS` at compile time; local builds can override the same en
 
 ## Client languages
 
-The signed game payload supports French and English language archives. The launcher writes the
-managed realm address for both installed locales (`frFR` and `enUS`). Select the language in WoW's
-native Interface → Languages panel, then restart the game. Existing keyboard bindings are preserved.
+There is one game installation: common files plus optional `frFR` and `enUS` language packs.
+On first use, the launcher follows the Windows user-interface language: French for any French
+variant, English otherwise. Settings can override this choice; the override survives restarts.
+The initial game language follows the launcher. An existing game's saved language and an explicit
+game-language choice are preserved independently. Settings can download another available pack
+without reinstalling common files. A missing selected pack blocks Play until installation finishes.
+
+The active pack is downloaded first, followed by common files and any other retained/requested
+packs. Updates and Repair maintain every previously installed pack. Only locales advertised by the
+signed manifest are offered. Each installed locale gets the managed realm address; unrelated game
+settings and saved key bindings are preserved.
+
+The signed envelope remains schema 1. Its payload schema 2 adds `locales` and an optional `locale`
+on language file entries; common files omit it. The aggregate file count and byte count cover the
+entire signed payload. The updater validates every locale/path assignment and each complete native
+archive chain, then computes transfer totals from the chosen files. Legacy schema 1 payloads remain
+monolithic: all listed files are maintained together.
+
+Release the compatible launcher **before** publishing a schema 2 game manifest; older launchers
+reject the new payload. Until that manifest is published, a legacy manifest cannot provide optional
+downloads.
+
+The launcher reads its latest three articles directly from the website backend:
+`https://api.rivalsbeyond.com/api/v1/news?locale=en&page=1&pageSize=3` (or `locale=fr`).
+Article links open `https://rivalsbeyond.com/en/news/<slug>` or `/fr/news/<slug>`.
+There is no bundled article list or separately published news feed. A validated API response is cached
+per language for network outages; without a cache, a localized unavailable message appears.
+News refreshes at startup, on language changes and during the ten-minute update check. Delayed
+responses from a previous language cannot replace the selected language's articles.
+The API is authenticated through HTTPS; game and launcher updates retain their signed manifests.
 
 ## Automatic client diagnostics
 

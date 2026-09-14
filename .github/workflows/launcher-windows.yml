@@ -11,10 +11,6 @@ on:
         description: Signed client manifest URL
         required: true
         default: https://moba-data.nbg1.your-objectstorage.com/client/manifests/stable.json
-      news_url:
-        description: Signed launcher news URL
-        required: true
-        default: https://moba-data.nbg1.your-objectstorage.com/launcher/news/stable.json
       publish:
         description: Publish this signed launcher as the automatic stable update
         required: true
@@ -47,7 +43,6 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           MOBA_MANIFEST_URL: ${{ inputs.manifest_url }}
-          MOBA_NEWS_URL: ${{ inputs.news_url }}
           MOBA_REALM_ADDRESS: ${{ inputs.realm_address }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

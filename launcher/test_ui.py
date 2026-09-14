@@ -1,4 +1,6 @@
 import json
+from html.parser import HTMLParser
+import subprocess
 import tomllib
 import unittest
 from pathlib import Path
@@ -8,6 +10,9 @@ ROOT = Path(__file__).resolve().parent
 
 
 class LauncherUiTest(unittest.TestCase):
+    def test_language_preferences_and_download_actions_execute_production_ui(self):
+        subprocess.run(["node", str(ROOT / "test_ui_languages.js")], check=True)
+
     def test_automatic_diagnostics_preference_is_disclosed_and_passed_to_the_game_launch(self):
         html = (ROOT / "ui/index.html").read_text()
         script = (ROOT / "ui/app.js").read_text()
@@ -52,8 +57,8 @@ class LauncherUiTest(unittest.TestCase):
         script = (ROOT / "ui/app.js").read_text()
         self.assertIn('id="news"', html)
         self.assertIn('id="news-grid"', html)
-        self.assertIn('id="hero-cta" class="outline-button"', html)
-        self.assertIn('href="https://rivalsbeyond.com/fr/news"', html)
+        self.assertRegex(html, r'id="hero-cta"[^>]*class="outline-button"')
+        self.assertIn('href="https://rivalsbeyond.com/en/news"', html)
         self.assertNotIn('document.querySelector("#hero-cta").addEventListener', script)
         self.assertEqual(html.count('id="primary-action"'), 1)
         self.assertNotIn('id="update"', html)
@@ -77,25 +82,16 @@ class LauncherUiTest(unittest.TestCase):
         )
         self.assertEqual(opener["allow"], [{"url": "https://rivalsbeyond.com/*"}])
 
-    def test_news_are_remote_signed_cached_and_rendered_as_text(self):
+    def test_news_come_from_localized_backend_and_render_as_text(self):
+        subprocess.run(["node", str(ROOT / "test_ui_news.js")], check=True)
         script = (ROOT / "ui/app.js").read_text()
-        self.assertIn('invoke("launcher_news")', script)
-        self.assertIn("moba-launcher-news", script)
-        self.assertIn("textContent", script)
+        news = (ROOT / "src-tauri/src/news.rs").read_text()
+        main = (ROOT / "src-tauri/src/main.rs").read_text()
         self.assertNotIn("innerHTML", script)
-        self.assertIn('document.createElement("a")', script)
-        self.assertIn("https://rivalsbeyond.com/fr/news/", script)
-        feed = json.loads((ROOT / "news.json").read_text())
-        self.assertEqual(feed["schema_version"], 1)
-        self.assertEqual(len(feed["items"]), 3)
-        self.assertEqual(
-            [item["slug"] for item in feed["items"]],
-            [
-                "un-compte-site-et-jeu",
-                "le-projet-devient-rivals-beyond",
-                "pings-tactiques",
-            ],
-        )
+        self.assertNotIn("LauncherNews", script)
+        self.assertNotIn("MOBA_NEWS_URL", main)
+        self.assertIn("https://api.rivalsbeyond.com/api/v1/news", news)
+        self.assertFalse((ROOT / "news.json").exists())
 
     def test_launcher_self_update_is_signed_and_runs_before_client_status(self):
         script = (ROOT / "ui/app.js").read_text()
@@ -121,6 +117,27 @@ class LauncherUiTest(unittest.TestCase):
         realm_input = workflow.split("      realm_address:", 1)[1].split("      manifest_url:", 1)[0]
         self.assertIn("default: moba.rivalsbeyond.com", realm_input)
         self.assertIn("MOBA_REALM_ADDRESS: ${{ inputs.realm_address }}", workflow)
+
+    def test_windows_installer_supports_french_and_english_with_english_fallback(self):
+        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
+        self.assertEqual(tauri["bundle"]["windows"]["nsis"], {
+            "languages": ["English", "French"], "displayLanguageSelector": True,
+        })
+        self.assertEqual(tauri["bundle"]["shortDescription"], "Install, update and play Rivals Beyond")
+
+    def test_html_has_no_untranslated_visible_copy_outside_the_brand(self):
+        class CopyParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.copy = []
+
+            def handle_data(self, data):
+                if any(character.isalpha() for character in data):
+                    self.copy.append(data.strip())
+
+        parser = CopyParser()
+        parser.feed((ROOT / "ui/index.html").read_text())
+        self.assertEqual(parser.copy, ["Rivals Beyond"])
 
     def test_windows_installer_bundles_webview2_without_a_separate_download(self):
         tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())

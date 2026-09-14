@@ -35,3 +35,24 @@ Run the updater tests after changing this contract:
 ```bash
 cargo test --manifest-path launcher/src-tauri/Cargo.toml --no-default-features --lib
 ```
+
+## Launcher and game languages
+
+One installation owns common files plus optional `frFR`/`enUS` packs. The signed envelope stays
+schema 1; manifest payload schema 2 declares `locales` and tags each `Data/<locale>/` file with its
+locale. Validate the complete signed payload before filtering. Download the active pack first,
+retain installed packs during update/repair, and never report a selected missing pack ready.
+Launcher language defaults to the Windows user UI language (all French variants => French,
+otherwise English); saved manual choices win. Game language initially follows the launcher while
+preserving an existing native selection or explicit game-language override. Never overwrite unrelated
+`WTF/Config.wtf` preferences. UI strings live in `launcher/ui/locales.js`; progress uses stable phases.
+
+
+## Website articles
+
+`moba-web` owns published news. Read its existing public endpoint at
+`https://api.rivalsbeyond.com/api/v1/news?locale=fr&page=1&pageSize=3` with `fr` or `en`
+matching the launcher. Links use the same locale under `https://rivalsbeyond.com/<locale>/news`.
+Do not restore a bundled article list, signed news JSON release or a second publishing pipeline.
+Keep responses bounded, validate the requested locale and slugs, render text safely, and isolate
+the offline cache by language. Game-client and launcher update signatures are unaffected.

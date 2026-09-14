@@ -19,10 +19,6 @@ const MANIFEST_URL: &str = match option_env!("MOBA_MANIFEST_URL") {
     Some(value) => value,
     None => "https://moba-data.nbg1.your-objectstorage.com/client/manifests/stable.json",
 };
-const NEWS_URL: &str = match option_env!("MOBA_NEWS_URL") {
-    Some(value) => value,
-    None => "https://moba-data.nbg1.your-objectstorage.com/launcher/news/stable.json",
-};
 const REALM_ADDRESS: &str = match option_env!("MOBA_REALM_ADDRESS") {
     Some(value) => value,
     None => "moba.rivalsbeyond.com",
@@ -57,10 +53,17 @@ fn http_client() -> Result<reqwest::blocking::Client, String> {
 }
 
 #[tauri::command]
-fn choose_client_dir(app: tauri::AppHandle) -> Result<Option<String>, LauncherError> {
+fn choose_client_dir(
+    app: tauri::AppHandle,
+    locale: String,
+) -> Result<Option<String>, LauncherError> {
     app.dialog()
         .file()
-        .set_title("Choisir le dossier du client MOBA")
+        .set_title(if locale == "frFR" {
+            "Choisir le dossier du client MOBA"
+        } else {
+            "Choose the MOBA client folder"
+        })
         .blocking_pick_folder()
         .map(|path| {
             path.into_path()
@@ -72,11 +75,14 @@ fn choose_client_dir(app: tauri::AppHandle) -> Result<Option<String>, LauncherEr
 }
 
 #[tauri::command]
-async fn client_status(client_dir: String) -> Result<updater::ClientStatus, LauncherError> {
+async fn client_status(
+    client_dir: String,
+    locale: String,
+) -> Result<updater::ClientStatus, LauncherError> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let http = http_client()?;
         let loaded = updater::fetch_manifest(&http, MANIFEST_URL, updater::public_key()?)?;
-        updater::client_status_against_manifest(Path::new(&client_dir), &loaded)
+        updater::client_status_for_locale(Path::new(&client_dir), &loaded, &locale)
     })
     .await
     .map_err(|error| format!("La vérification du client a échoué : {error}"))?;
@@ -84,10 +90,10 @@ async fn client_status(client_dir: String) -> Result<updater::ClientStatus, Laun
 }
 
 #[tauri::command]
-async fn launcher_news() -> Result<news::NewsFeed, LauncherError> {
+async fn launcher_news(locale: String) -> Result<news::NewsFeed, LauncherError> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let http = http_client()?;
-        news::fetch_news(&http, NEWS_URL, updater::public_key()?)
+        news::fetch_news(&http, &locale)
     })
     .await
     .map_err(|error| format!("La récupération des nouveautés a échoué : {error}"))?;
@@ -209,6 +215,8 @@ async fn update_client(
     app: tauri::AppHandle,
     client_dir: String,
     repair: bool,
+    locale: String,
+    additional_locale: Option<String>,
 ) -> Result<updater::UpdateSummary, LauncherError> {
     if app.state::<Busy>().0.swap(true, Ordering::AcqRel) {
         return Err(LauncherError::from(
@@ -219,12 +227,14 @@ async fn update_client(
     let result = tauri::async_runtime::spawn_blocking(move || {
         let http = http_client()?;
         let loaded = updater::fetch_manifest(&http, MANIFEST_URL, updater::public_key()?)?;
-        updater::update_client(
+        updater::update_client_for_locale(
             &http,
             Path::new(&client_dir),
             loaded,
             REALM_ADDRESS,
             repair,
+            &locale,
+            additional_locale.as_deref(),
             |progress| {
                 let _ = worker_app.emit("launcher-progress", progress);
             },
@@ -241,6 +251,7 @@ async fn launch_game(
     app: tauri::AppHandle,
     client_dir: String,
     diagnostics_enabled: bool,
+    locale: String,
 ) -> Result<(), LauncherError> {
     if app.state::<Busy>().0.swap(true, Ordering::AcqRel) {
         return Err(LauncherError::from(
@@ -252,7 +263,7 @@ async fn launch_game(
         let root = PathBuf::from(client_dir);
         let http = http_client()?;
         let loaded = updater::fetch_manifest(&http, MANIFEST_URL, updater::public_key()?)?;
-        if !updater::client_status_against_manifest(&root, &loaded)?.can_launch {
+        if !updater::client_status_for_locale(&root, &loaded, &locale)?.can_launch {
             return Err("Mise à jour obligatoire avant de jouer.".into());
         }
         updater::configure_graphics_backend(&root, &loaded.manifest, updater::dxvk_supported())?;
@@ -262,6 +273,7 @@ async fn launch_game(
             (size.width, size.height)
         });
         let resolution = updater::configure_client_defaults(&root, screen)?;
+        updater::configure_client_locale(&root, &locale)?;
         let session = diagnostics::new_session();
         let mut child = Command::new(wow)
             .current_dir(&root)
@@ -294,6 +306,23 @@ async fn launch_game(
     result?.map_err(LauncherError::from)
 }
 
+#[tauri::command]
+fn system_locale() -> &'static str {
+    #[cfg(windows)]
+    let french =
+        unsafe { windows_sys::Win32::Globalization::GetUserDefaultUILanguage() } & 0x03ff == 0x0c;
+    #[cfg(not(windows))]
+    let french = ["LC_ALL", "LC_MESSAGES", "LANG"]
+        .iter()
+        .find_map(|key| std::env::var(key).ok().filter(|value| !value.is_empty()))
+        .is_some_and(|value| value.to_ascii_lowercase().starts_with("fr"));
+    if french {
+        "frFR"
+    } else {
+        "enUS"
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(Busy(AtomicBool::new(false)))
@@ -302,6 +331,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            system_locale,
             choose_client_dir,
             client_status,
             launcher_news,

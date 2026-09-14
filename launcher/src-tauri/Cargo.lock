@@ -2186,7 +2186,7 @@ dependencies = [
 
 [[package]]
 name = "moba-launcher"
-version = "0.3.9"
+version = "0.3.10"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",

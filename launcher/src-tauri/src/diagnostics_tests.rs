@@ -228,6 +228,7 @@ fn every_started_process_records_its_version_duration_and_abnormal_exit_without_
 ) {
     let root = directory();
     let manifest = crate::updater::Manifest {
+        locales: Vec::new(),
         schema_version: 1,
         sequence: 42,
         client_version: "test-42".into(),

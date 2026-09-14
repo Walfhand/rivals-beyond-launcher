@@ -1,33 +1,34 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="dark">
     <title>Rivals Beyond</title>
     <link rel="stylesheet" href="style.css">
+    <script src="locales.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
-    <a class="skip-link" href="#home">Aller au contenu</a>
+    <a class="skip-link" href="#home" data-i18n="skip"></a>
     <header class="topbar">
       <button class="brand" type="button" data-scroll="home"
-              aria-label="Retour à l’accueil">
+              data-i18n-aria-label="home_aria">
         <img src="assets/moba-logo.png" width="500" height="234" alt="">
       </button>
-      <nav aria-label="Navigation principale">
-        <button class="nav-link active" type="button" data-scroll="home">Accueil</button>
-        <button class="nav-link" type="button" data-scroll="news">Notes de mise à jour</button>
+      <nav data-i18n-aria-label="navigation">
+        <button class="nav-link active" type="button" data-scroll="home" data-i18n="home"></button>
+        <button class="nav-link" type="button" data-scroll="news" data-i18n="patch_notes"></button>
       </nav>
       <div class="topbar-spacer"></div>
       <a class="account-link" href="https://rivalsbeyond.com/register"
-         target="_blank" rel="noreferrer">Créer un compte</a>
+         target="_blank" rel="noreferrer" data-i18n="register"></a>
       <div id="service-status" class="service-status checking" role="status">
         <span class="status-dot" aria-hidden="true"></span>
-        <span id="service-label">Vérification des services…</span>
+        <span id="service-label" data-i18n="services_checking"></span>
       </div>
       <button id="settings" class="icon-button" type="button"
-              aria-label="Ouvrir les paramètres" title="Paramètres">
+              data-i18n-aria-label="settings_open" data-i18n-title="settings">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm8.2 4.8v-2.4l-2.3-.7a7 7 0 0 0-.7-1.7l1.1-2.1-1.7-1.7-2.1 1.1a7 7 0 0 0-1.7-.7L12 2.8H9.6l-.7 2.3a7 7 0 0 0-1.7.7L5.1 4.7 3.4 6.4l1.1 2.1a7 7 0 0 0-.7 1.7l-2.3.7v2.4l2.3.7a7 7 0 0 0 .7 1.7l-1.1 2.1 1.7 1.7 2.1-1.1a7 7 0 0 0 1.7.7l.7 2.3H12l.7-2.3a7 7 0 0 0 1.7-.7l2.1 1.1 1.7-1.7-1.1-2.1a7 7 0 0 0 .7-1.7l2.3-.7Z"/>
         </svg>
@@ -37,54 +38,21 @@
     <main id="home" class="stage">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p id="hero-eyebrow" class="eyebrow">SAISON 0 · LE SEUIL</p>
-          <h1 id="hero-title">Entrez dans<br>le Seuil</h1>
-          <p id="hero-summary" class="hero-summary">
-            Dix Inassouvis s’affrontent entre deux Nexus sur The Last Divide.
-          </p>
-          <a id="hero-cta" class="outline-button" href="https://rivalsbeyond.com/fr/news"
-             target="_blank" rel="noreferrer">
-            Lire les chroniques
-          </a>
+          <p id="hero-eyebrow" data-i18n="hero_eyebrow" class="eyebrow"></p>
+          <h1 id="hero-title" data-i18n="hero_title"></h1>
+          <p id="hero-summary" data-i18n="hero_summary" class="hero-summary"></p>
+          <a id="hero-cta" data-i18n="hero_cta" class="outline-button" href="https://rivalsbeyond.com/en/news"
+             target="_blank" rel="noreferrer"></a>
         </div>
       </section>
 
       <section id="news" class="news-section" aria-labelledby="news-title">
         <div class="section-heading">
-          <h2 id="news-title">Chroniques du Seuil</h2>
+          <h2 id="news-title" data-i18n="news_title"></h2>
           <span class="heading-line" aria-hidden="true"></span>
         </div>
+        <p id="news-status" role="status" data-i18n="news_loading"></p>
         <div id="news-grid" class="news-grid">
-          <a class="news-card" href="https://rivalsbeyond.com/fr/news/un-compte-site-et-jeu"
-             target="_blank" rel="noreferrer">
-            <div class="news-art" aria-hidden="true"></div>
-            <div class="news-copy">
-              <p class="news-category">COMPTE</p>
-              <h3>Un seul compte relie le site et le jeu</h3>
-              <p class="news-summary">Utilise les mêmes identifiants sur le site et dans le jeu.</p>
-              <time datetime="2026-08-31">31 août 2026</time>
-            </div>
-          </a>
-          <a class="news-card" href="https://rivalsbeyond.com/fr/news/le-projet-devient-rivals-beyond"
-             target="_blank" rel="noreferrer">
-            <div class="news-art" aria-hidden="true"></div>
-            <div class="news-copy">
-              <p class="news-category">PROJET</p>
-              <h3>Le projet devient Rivals Beyond</h3>
-              <p class="news-summary">Le jeu, le launcher et le site portent désormais le même nom.</p>
-              <time datetime="2026-08-29">29 août 2026</time>
-            </div>
-          </a>
-          <a class="news-card" href="https://rivalsbeyond.com/fr/news/pings-tactiques"
-             target="_blank" rel="noreferrer">
-            <div class="news-art" aria-hidden="true"></div>
-            <div class="news-copy">
-              <p class="news-category">GAMEPLAY</p>
-              <h3>Cinq pings pour parler sans s’arrêter</h3>
-              <p class="news-summary">Cinq intentions tactiques, visibles dans le monde et sur la minimap.</p>
-              <time datetime="2026-08-26">26 août 2026</time>
-            </div>
-          </a>
         </div>
       </section>
     </main>
@@ -92,21 +60,19 @@
     <footer class="action-dock" aria-labelledby="client-status">
       <div id="error-banner" class="error-banner" hidden>
         <div>
-          <strong id="error-message">La mise à jour a échoué.</strong>
+          <strong id="error-message" data-i18n="error_unknown"></strong>
           <details>
-            <summary>Détails techniques</summary>
+            <summary data-i18n="technical_details"></summary>
             <code id="error-detail"></code>
           </details>
         </div>
       </div>
 
       <div class="update-state">
-        <p id="status-kicker" class="dock-kicker">CLIENT DE JEU</p>
-        <p id="client-status" class="client-status" role="status" aria-live="polite">
-          Sélectionne un dossier d’installation
-        </p>
-        <p id="version" class="version">Version non installée</p>
-        <progress id="progress" max="100" value="0" aria-label="Progression"></progress>
+        <p id="status-kicker" class="dock-kicker" data-i18n="game_client"></p>
+        <p id="client-status" class="client-status" role="status" aria-live="polite" data-i18n="select_folder"></p>
+        <p id="version" class="version" data-i18n="not_installed"></p>
+        <progress id="progress" max="100" value="0" data-i18n-aria-label="progress"></progress>
       </div>
 
       <div class="transfer-state">
@@ -114,17 +80,15 @@
           <path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/>
         </svg>
         <div>
-          <p id="progress-detail">Prêt</p>
+          <p id="progress-detail" data-i18n="ready"></p>
           <p id="transfer-speed" class="transfer-speed"></p>
         </div>
       </div>
 
       <div class="primary-actions">
-        <button id="primary-action" class="primary-button" type="button">
-          Installer
-        </button>
+        <button id="primary-action" class="primary-button" type="button" data-i18n="install"></button>
         <button id="more-options" class="more-button" type="button"
-                aria-label="Options du client" title="Options du client">•••</button>
+                data-i18n-aria-label="client_options" data-i18n-title="client_options">•••</button>
       </div>
     </footer>
 
@@ -132,35 +96,53 @@
       <form method="dialog" class="settings-panel">
         <div class="dialog-heading">
           <div>
-            <p class="eyebrow">PARAMÈTRES</p>
-            <h2>Installation du client</h2>
+            <p class="eyebrow" data-i18n="settings_heading"></p>
+            <h2 data-i18n="installation"></h2>
           </div>
-          <button class="dialog-close" value="cancel" aria-label="Fermer">×</button>
+          <button class="dialog-close" value="cancel" data-i18n-aria-label="close">×</button>
         </div>
 
-        <label for="client-path">Dossier du client</label>
+        <label for="launcher-language" data-i18n="language"></label>
+        <div class="path-row">
+          <select id="launcher-language" aria-describedby="language-help">
+            <option value="fr" data-i18n="language_frFR"></option>
+            <option value="en" data-i18n="language_enUS"></option>
+          </select>
+        </div>
+        <label for="game-language" data-i18n="game_language"></label>
+        <div class="path-row">
+          <select id="game-language" aria-describedby="language-help">
+            <option value="frFR" data-i18n="language_frFR"></option>
+            <option value="enUS" data-i18n="language_enUS"></option>
+          </select>
+        </div>
+        <p id="language-help" class="setting-help" data-i18n="language_help"></p>
+
+        <label for="client-path" data-i18n="client_folder"></label>
         <div class="path-row">
           <input id="client-path" type="text" readonly
-                 placeholder="Choisir un dossier vide ou un client existant">
-          <button id="choose" class="secondary-button" type="button">Choisir</button>
+                 data-i18n-placeholder="folder_placeholder">
+          <button id="choose" class="secondary-button" type="button" data-i18n="choose"></button>
         </div>
-        <p class="setting-help">
-          Les paramètres, captures d’écran, addons et fichiers personnels sont conservés.
-        </p>
+        <p class="setting-help" data-i18n="files_preserved"></p>
+
+        <label for="additional-language" data-i18n="additional_language"></label>
+        <div class="path-row">
+          <select id="additional-language" aria-describedby="packs-help"></select>
+          <button id="add-language" class="secondary-button" type="button" data-i18n="add_language" disabled></button>
+        </div>
+        <p id="installed-languages" class="setting-help" role="status"></p>
+        <p id="packs-help" class="setting-help" data-i18n="packs_help"></p>
 
         <label class="diagnostics-setting" for="diagnostics-enabled">
           <input id="diagnostics-enabled" type="checkbox" checked aria-describedby="diagnostics-help">
-          Envoyer automatiquement les diagnostics techniques
+          <span data-i18n="diagnostics"></span>
         </label>
-        <p id="diagnostics-help" class="setting-help">
-          Erreurs techniques, versions, résolution, lancements et durée de jeu.
-        </p>
+        <p id="diagnostics-help" class="setting-help" data-i18n="diagnostics_help"></p>
 
         <div class="dialog-actions">
-          <button id="repair" class="secondary-button" type="button" disabled>
-            Vérifier et réparer
-          </button>
-          <button class="secondary-button" value="cancel">Fermer</button>
+          <button id="repair" class="secondary-button" type="button" disabled data-i18n="repair"></button>
+          <button class="secondary-button" value="cancel" data-i18n="close"></button>
         </div>
       </form>
     </dialog>
