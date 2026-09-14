@@ -69,7 +69,7 @@ if (require.main === module) (async () => {
     assert.deepEqual(dictionaries.fr[key].match(/\{\w+\}/g), dictionaries.en[key].match(/\{\w+\}/g), key);
   }
   assert.equal(h.node('primary-action').textContent, 'Install');
-  assert.equal(h.node('hero-title').textContent, 'Enter the Threshold');
+  assert.equal(h.node('hero-title').textContent, 'World of Warcraft\nreforged as a MOBA');
   assert.equal(h.context.document.documentElement.lang, 'en');
   h.run('showError({ code: "network", message: "Connexion interrompue", detail: "Lecture réseau", retryable: true }, "update")');
   assert.equal(h.node('error-message').textContent, dictionaries.en.error_network);

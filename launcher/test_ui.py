@@ -1,3 +1,4 @@
+import hashlib
 import json
 from html.parser import HTMLParser
 import subprocess
@@ -36,17 +37,13 @@ class LauncherUiTest(unittest.TestCase):
         self.assertNotIn("World of Guerilla", html + script)
         self.assertTrue((ROOT / "ui/assets/moba-logo.png").is_file())
 
-    def test_launcher_uses_the_selected_last_divide_art_direction(self):
+    def test_launcher_uses_the_selected_galdric_vespera_duel(self):
         style = (ROOT / "ui/style.css").read_text(encoding="utf-8")
-        selected_art = (
-            ROOT.parent
-            / "client-patches/textures/login/rivals_beyond_last_divide_login_selected.png"
-        )
-
         self.assertEqual(
-            (ROOT / "ui/assets/moba-background.png").read_bytes(),
-            selected_art.read_bytes(),
+            hashlib.sha256((ROOT / "ui/assets/moba-background.png").read_bytes()).hexdigest(),
+            "17d299dc78d122dc4c77b19379627dcd8c41790375c215b832d65df48005db42",
         )
+        self.assertIn('url("assets/moba-background.png")', style)
         self.assertIn("--azure:", style)
         self.assertIn("--scarlet:", style)
         self.assertNotIn("backdrop-filter", style)

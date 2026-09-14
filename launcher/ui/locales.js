@@ -1,8 +1,8 @@
 const LauncherLocales = {
   "fr": {
-    "hero_eyebrow": "SAISON 0 · LE SEUIL",
-    "hero_title": "Entrez dans le Seuil",
-    "hero_summary": "Dix Inassouvis s’affrontent entre deux Nexus sur The Last Divide.",
+    "hero_tagline": "La mort n’a pas mis fin à tes combats.",
+    "hero_title": "World of Warcraft\nreforgé en MOBA",
+    "hero_summary": "Choisis ton incarnation, retrouve les autres âmes au Confluent et rejoins The Last Divide.",
     "hero_cta": "Lire les chroniques",
     "news_loading": "Chargement des actualités…",
     "news_empty": "Aucune actualité publiée pour le moment.",
@@ -13,7 +13,7 @@ const LauncherLocales = {
     "home_aria": "Retour à l’accueil",
     "navigation": "Navigation principale",
     "home": "Accueil",
-    "patch_notes": "Notes de mise à jour",
+    "patch_notes": "Actualités",
     "register": "Créer un compte",
     "services_checking": "Vérification des services…",
     "settings_open": "Ouvrir les paramètres",
@@ -124,9 +124,9 @@ const LauncherLocales = {
     "phase_install": "Installation : {path}"
   },
   "en": {
-    "hero_eyebrow": "SEASON 0 · THE THRESHOLD",
-    "hero_title": "Enter the Threshold",
-    "hero_summary": "Ten Unfulfilled battle between two Nexuses on The Last Divide.",
+    "hero_tagline": "Death did not end your battles.",
+    "hero_title": "World of Warcraft\nreforged as a MOBA",
+    "hero_summary": "Choose your incarnation, meet the other souls in the Confluence and enter The Last Divide.",
     "hero_cta": "Read the chronicles",
     "news_loading": "Loading news…",
     "news_empty": "No news has been published yet.",
@@ -137,7 +137,7 @@ const LauncherLocales = {
     "home_aria": "Back to home",
     "navigation": "Main navigation",
     "home": "Home",
-    "patch_notes": "Patch notes",
+    "patch_notes": "News",
     "register": "Create account",
     "services_checking": "Checking services…",
     "settings_open": "Open settings",

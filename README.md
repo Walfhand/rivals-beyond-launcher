@@ -32,6 +32,26 @@ contain the game client, server, accounts or private signing keys.
 
 ## Build and test
 
+The launcher background is the selected Galdric versus Vespera illustration (D01), stored directly
+in `launcher/ui/assets/moba-background.png`. It is independent of the game's login artwork;
+there is no second copy under `client-patches`. The UI test pins the selected asset's SHA-256.
+
+The interface follows the website's art direction: blue-charcoal stone, ivory actions with a scarlet
+edge, and the Spectral/Alegreya Sans typefaces bundled under `launcher/ui/assets/fonts` with their
+SIL Open Font License notices. It makes no font request at runtime. The illustration has its own
+space beside the introduction; news scrolls above a persistent install/update/play dock. Settings
+remain scrollable at the minimum window size, and reduced-motion preferences disable transitions.
+
+Optional browser layout checks use Playwright already installed on `NODE_PATH`:
+
+```bash
+NODE_PATH=/path/to/node_modules node launcher/test_ui_layout.js
+```
+
+They exercise the shipped UI in FR/EN at three window sizes and eight client states through a mock
+native bridge. No update or game launch occurs. Preview screenshots (with demonstration articles)
+are written to the ignored `launcher/dist/da-preview` directory.
+
 The updater core is testable without the Windows desktop runtime:
 
 ```bash
