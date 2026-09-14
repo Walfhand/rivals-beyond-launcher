@@ -1342,11 +1342,17 @@ fn append_config_value(config: &mut Vec<u8>, name: &str, value: &str) {
 }
 
 fn write_realmlist(root: &Path, realm_address: &str) -> Result<(), String> {
-    let path = target_path(root, "Data/frFR/realmlist.wtf", true)?;
-    atomic_write(
-        &path,
-        format!("set realmlist {realm_address}\r\n").as_bytes(),
-    )
+    for locale in ["frFR", "enUS"] {
+        if locale != "frFR" && !root.join("Data").join(locale).is_dir() {
+            continue;
+        }
+        let path = target_path(root, &format!("Data/{locale}/realmlist.wtf"), true)?;
+        atomic_write(
+            &path,
+            format!("set realmlist {realm_address}\r\n").as_bytes(),
+        )?;
+    }
+    Ok(())
 }
 
 fn state_path(root: &Path) -> PathBuf {
@@ -1498,6 +1504,21 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn every_installed_language_connects_to_the_managed_realm() {
+        let root = TestDir::new();
+        fs::create_dir_all(root.0.join("Data/enUS")).unwrap();
+        fs::write(root.0.join("Data/enUS/realmlist.wtf"), b"set realmlist other.example").unwrap();
+        write_realmlist(&root.0, "realm.example").unwrap();
+        for locale in ["frFR", "enUS"] {
+            assert_eq!(
+                fs::read_to_string(root.0.join(format!("Data/{locale}/realmlist.wtf"))).unwrap(),
+                "set realmlist realm.example\r\n"
+            );
+        }
+        assert!(!root.0.join("Data/enGB").exists());
     }
 
     #[test]

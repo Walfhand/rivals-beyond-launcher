@@ -46,6 +46,12 @@ Windows NSIS installers are built from this repository by [GitHub Actions](.gith
 Builds default to the game realm `moba.rivalsbeyond.com`. The workflow's `realm_address` input
 sets `MOBA_REALM_ADDRESS` at compile time; local builds can override the same environment variable.
 
+## Client languages
+
+The signed game payload supports French and English language archives. The launcher writes the
+managed realm address for both installed locales (`frFR` and `enUS`). Select the language in WoW's
+native Interface → Languages panel, then restart the game. Existing keyboard bindings are preserved.
+
 ## Automatic client diagnostics
 
 Automatic Sentry delivery is enabled by default; the settings checkbox remembers a player's opt-out.
