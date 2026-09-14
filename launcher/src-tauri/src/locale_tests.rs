@@ -95,6 +95,8 @@ fn real_downloads_install_one_pack_then_add_and_repair_the_other_in_place() {
             while requests < expected && std::time::Instant::now() < deadline {
                 match listener.accept() {
                     Ok((mut socket, _)) => {
+                        // Windows inherits the listener's nonblocking mode on accepted sockets.
+                        socket.set_nonblocking(false).unwrap();
                         socket.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
                         let mut request = [0; 4096];
                         socket.read(&mut request).unwrap();
