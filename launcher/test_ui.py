@@ -14,9 +14,9 @@ class LauncherUiTest(unittest.TestCase):
         subprocess.run(["node", str(ROOT / "test_ui_languages.js")], check=True)
 
     def test_automatic_diagnostics_preference_is_disclosed_and_passed_to_the_game_launch(self):
-        html = (ROOT / "ui/index.html").read_text()
-        script = (ROOT / "ui/app.js").read_text()
-        main = (ROOT / "src-tauri/src/main.rs").read_text()
+        html = (ROOT / "ui/index.html").read_text(encoding="utf-8")
+        script = (ROOT / "ui/app.js").read_text(encoding="utf-8")
+        main = (ROOT / "src-tauri/src/main.rs").read_text(encoding="utf-8")
         self.assertIn('id="diagnostics-enabled" type="checkbox" checked', html)
         self.assertIn('aria-describedby="diagnostics-help"', html)
         self.assertIn('diagnosticsEnabled: diagnosticsToggle.checked', script)
@@ -25,9 +25,9 @@ class LauncherUiTest(unittest.TestCase):
         self.assertIn('"MOBA_DIAGNOSTIC_SESSION"', main)
 
     def test_launcher_uses_the_rivals_beyond_brand(self):
-        html = (ROOT / "ui/index.html").read_text()
-        script = (ROOT / "ui/app.js").read_text()
-        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
+        html = (ROOT / "ui/index.html").read_text(encoding="utf-8")
+        script = (ROOT / "ui/app.js").read_text(encoding="utf-8")
+        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
 
         self.assertIn("Rivals Beyond", html)
         self.assertIn("Rivals Beyond", script)
@@ -37,7 +37,7 @@ class LauncherUiTest(unittest.TestCase):
         self.assertTrue((ROOT / "ui/assets/moba-logo.png").is_file())
 
     def test_launcher_uses_the_selected_last_divide_art_direction(self):
-        style = (ROOT / "ui/style.css").read_text()
+        style = (ROOT / "ui/style.css").read_text(encoding="utf-8")
         selected_art = (
             ROOT.parent
             / "client-patches/textures/login/rivals_beyond_last_divide_login_selected.png"
@@ -53,8 +53,8 @@ class LauncherUiTest(unittest.TestCase):
         self.assertNotIn("font-family: Inter", style)
 
     def test_home_has_news_and_one_contextual_primary_action(self):
-        html = (ROOT / "ui/index.html").read_text()
-        script = (ROOT / "ui/app.js").read_text()
+        html = (ROOT / "ui/index.html").read_text(encoding="utf-8")
+        script = (ROOT / "ui/app.js").read_text(encoding="utf-8")
         self.assertIn('id="news"', html)
         self.assertIn('id="news-grid"', html)
         self.assertRegex(html, r'id="hero-cta"[^>]*class="outline-button"')
@@ -65,10 +65,10 @@ class LauncherUiTest(unittest.TestCase):
         self.assertNotIn('id="play"', html)
 
     def test_account_creation_opens_only_the_official_registration_page(self):
-        html = (ROOT / "ui/index.html").read_text()
-        main = (ROOT / "src-tauri/src/main.rs").read_text()
-        cargo = (ROOT / "src-tauri/Cargo.toml").read_text()
-        capability = json.loads((ROOT / "src-tauri/capabilities/default.json").read_text())
+        html = (ROOT / "ui/index.html").read_text(encoding="utf-8")
+        main = (ROOT / "src-tauri/src/main.rs").read_text(encoding="utf-8")
+        cargo = (ROOT / "src-tauri/Cargo.toml").read_text(encoding="utf-8")
+        capability = json.loads((ROOT / "src-tauri/capabilities/default.json").read_text(encoding="utf-8"))
 
         self.assertIn('href="https://rivalsbeyond.com/register"', html)
         self.assertIn('target="_blank"', html)
@@ -84,9 +84,9 @@ class LauncherUiTest(unittest.TestCase):
 
     def test_news_come_from_localized_backend_and_render_as_text(self):
         subprocess.run(["node", str(ROOT / "test_ui_news.js")], check=True)
-        script = (ROOT / "ui/app.js").read_text()
-        news = (ROOT / "src-tauri/src/news.rs").read_text()
-        main = (ROOT / "src-tauri/src/main.rs").read_text()
+        script = (ROOT / "ui/app.js").read_text(encoding="utf-8")
+        news = (ROOT / "src-tauri/src/news.rs").read_text(encoding="utf-8")
+        main = (ROOT / "src-tauri/src/main.rs").read_text(encoding="utf-8")
         self.assertNotIn("innerHTML", script)
         self.assertNotIn("LauncherNews", script)
         self.assertNotIn("MOBA_NEWS_URL", main)
@@ -94,23 +94,23 @@ class LauncherUiTest(unittest.TestCase):
         self.assertFalse((ROOT / "news.json").exists())
 
     def test_launcher_self_update_is_signed_and_runs_before_client_status(self):
-        script = (ROOT / "ui/app.js").read_text()
+        script = (ROOT / "ui/app.js").read_text(encoding="utf-8")
         self.assertIn('invoke("check_launcher_update")', script)
         self.assertIn('invoke("install_launcher_update")', script)
         boot = script.split("async function boot()", 1)[1]
         self.assertLess(boot.index("await checkLauncherUpdate()"), boot.index("await refreshStatus(true)"))
-        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
+        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
         updater = tauri["plugins"]["updater"]
         self.assertTrue(tauri["bundle"]["createUpdaterArtifacts"])
         self.assertEqual(
             updater["pubkey"],
-            (ROOT / "updater-public-key.pub").read_text().strip(),
+            (ROOT / "updater-public-key.pub").read_text(encoding="utf-8").strip(),
         )
         self.assertEqual(updater["windows"]["installMode"], "passive")
 
     def test_windows_build_defaults_to_the_public_game_realm(self):
-        main = (ROOT / "src-tauri/src/main.rs").read_text()
-        workflow = (ROOT.parent / ".github/workflows/launcher-windows.yml").read_text()
+        main = (ROOT / "src-tauri/src/main.rs").read_text(encoding="utf-8")
+        workflow = (ROOT.parent / ".github/workflows/launcher-windows.yml").read_text(encoding="utf-8")
         realm = main.split("const REALM_ADDRESS:", 1)[1].split("};", 1)[0]
         self.assertIn('option_env!("MOBA_REALM_ADDRESS")', realm)
         self.assertIn('None => "moba.rivalsbeyond.com"', realm)
@@ -119,7 +119,7 @@ class LauncherUiTest(unittest.TestCase):
         self.assertIn("MOBA_REALM_ADDRESS: ${{ inputs.realm_address }}", workflow)
 
     def test_windows_installer_supports_french_and_english_with_english_fallback(self):
-        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
+        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
         self.assertEqual(tauri["bundle"]["windows"]["nsis"], {
             "languages": ["English", "French"], "displayLanguageSelector": True,
         })
@@ -136,23 +136,23 @@ class LauncherUiTest(unittest.TestCase):
                     self.copy.append(data.strip())
 
         parser = CopyParser()
-        parser.feed((ROOT / "ui/index.html").read_text())
+        parser.feed((ROOT / "ui/index.html").read_text(encoding="utf-8"))
         self.assertEqual(parser.copy, ["Rivals Beyond"])
 
     def test_windows_installer_bundles_webview2_without_a_separate_download(self):
-        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
+        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
         self.assertEqual(
             tauri["bundle"]["windows"]["webviewInstallMode"],
             {"type": "offlineInstaller", "silent": True},
         )
 
     def test_tauri_and_cargo_versions_stay_aligned(self):
-        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text())
-        cargo = tomllib.loads((ROOT / "src-tauri/Cargo.toml").read_text())
+        tauri = json.loads((ROOT / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
+        cargo = tomllib.loads((ROOT / "src-tauri/Cargo.toml").read_text(encoding="utf-8"))
         self.assertEqual(tauri["version"], cargo["package"]["version"])
 
     def test_windows_release_verifies_and_publishes_the_signed_updater(self):
-        workflow = (ROOT.parent / ".github/workflows/launcher-windows.yml").read_text()
+        workflow = (ROOT.parent / ".github/workflows/launcher-windows.yml").read_text(encoding="utf-8")
         self.assertIn("TAURI_SIGNING_PRIVATE_KEY", workflow)
         self.assertIn("verify_updater_signature", workflow)
         self.assertIn("actions/upload-artifact@v4", workflow)
